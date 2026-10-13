@@ -120,13 +120,21 @@ class AccuDrawUi {
     }
 
   _createElements() {
+    // Replace dead external image with crisp inline SVG icon
+    const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    iconSvg.setAttribute('viewBox', '0 0 100 100');
+    iconSvg.setAttribute('class', 'accudrawIcon');
+    iconSvg.innerHTML = `
+      <circle cx="50" cy="50" r="42" fill="none" stroke="#00e676" stroke-width="4" stroke-dasharray="6,4"/>
+      <circle cx="50" cy="50" r="6" fill="#00e676"/>
+      <line x1="50" y1="12" x2="50" y2="88" stroke="#00e676" stroke-width="3"/>
+      <line x1="12" y1="50" x2="88" y2="50" stroke="#00e676" stroke-width="3"/>
+    `;
+
     this.draggerBox = makeElement(
       'div',
       { className: 'accudrawDragger' },
-      makeElement('img', {
-        src: 'https://recursi.dev/resources/accudraw-small.png',
-        className: 'accudrawIcon',
-      }),
+      iconSvg,
       makeElement('div', { className: 'accudrawTitle' }, 'accudraw')
     );
 
@@ -154,7 +162,6 @@ class AccuDrawUi {
     container.appendChild(this.outerBox);
     this._setupDrag();
   }
-
   _setupDrag() {
     this.dragState = { active: false, offsetX: 0, offsetY: 0, moved: false };
 
