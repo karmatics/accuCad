@@ -12,225 +12,228 @@ class Main {
   }
 
   async run(env) {
-      console.log('[accuCad] run() invoked.');
-      if (this.rootElement) this.destroy();
+    console.log('[accuCad] run() invoked.');
+    if (this.rootElement) this.destroy();
 
-      if (!env || !env.container) {
-        throw new Error(
-          '[accuCad] run() requires an environment object with a valid container.'
-        );
-      }
-
-      const parentElement = env.container;
-      this.rootElement = parentElement;
-
-      const resetScroll = () => {
-        if (this.rootElement) {
-          this.rootElement.scrollLeft = 0;
-          this.rootElement.scrollTop = 0;
-        }
-        window.scrollTo(0, 0);
-        document.body.scrollLeft = 0;
-        document.body.scrollTop = 0;
-      };
-
-      this.rootElement.addEventListener('scroll', resetScroll);
-      window.addEventListener('scroll', resetScroll);
-      document.body.addEventListener('scroll', resetScroll);
-      this._scrollResetHandler = resetScroll;
-
-      const layoutWrapper = document.createElement('div');
-      layoutWrapper.id = 'accucad-layout-wrapper';
-      layoutWrapper.style.cssText =
-        'display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; position: relative;';
-      parentElement.appendChild(layoutWrapper);
-      this.layoutWrapper = layoutWrapper;
-
-      const canvasId = 'accucad-canvas-' + Math.random().toString(36).slice(2);
-      const canvasContainer = document.createElement('div');
-      canvasContainer.id = canvasId;
-      canvasContainer.style.cssText =
-        'flex-grow: 1; height: 100%; position: relative; overflow: hidden;';
-      layoutWrapper.appendChild(canvasContainer);
-      this.canvasContainer = canvasContainer;
-
-      if (
-        !parentElement._vibesAppResizeObserver &&
-        typeof ResizeObserver !== 'undefined'
-      ) {
-        const ro = new ResizeObserver((entries) => {
-          for (const entry of entries) {
-            if (this.app && typeof this.app.resize === 'function') {
-              this.app.resize(entry.contentRect.width, entry.contentRect.height);
-            }
-          }
-        });
-        ro.observe(canvasContainer);
-        parentElement._vibesAppResizeObserver = ro;
-      }
-
-      const staticClasses = [
-        'CameraOrbitAnimator',
-        'DebugConfig',
-        'ElementOperations',
-        'ModelLoader',
-        'TentativePointHandler',
-        'ViewControlsManager',
-        'ViewManipulator',
-      ];
-      for (const clsName of staticClasses) {
-        const cls = window[clsName] || globalThis[clsName];
-        if (cls && typeof cls.initStatics === 'function') cls.initStatics();
-      }
-
-      if (typeof PopupBox !== 'undefined' && typeof PopupBox.init === 'function') {
-        PopupBox.init();
-      }
-
-      this.app = new ThreeJSLoader(canvasId, {
-        cameraPos: { x: 5, y: 5, z: 8 },
-        enableControls: false,
-        useThickLines: true,
-        commonLoaders: true,
-        onUpdate: () => this._onUpdate?.(),
-      });
-
-      await this.app.init(canvasContainer);
-
-      this.THREE = this.app.THREE || window.THREE;
-      if (this.app.scene) {
-        this.app.scene.background = new this.THREE.Color(0x222222);
-      }
-
-      const target = new this.THREE.Vector3(0, 0.6, 0);
-      this.app.camera.lookAt(target);
-
-      this.threeDView = {
-        scene: this.app.scene,
-        camera: this.app.camera,
-        renderer: this.app.renderer,
-        target: target,
-        envRotation: 0,
-      };
-
-      this.baseController = new BaseController(
-        this.threeDView,
-        this.app.renderer.domElement
+    if (!env || !env.container) {
+      throw new Error(
+        '[accuCad] run() requires an environment object with a valid container.'
       );
-      ControllerSetup.initializeController(
-        this.baseController,
-        this.threeDView.scene
-      );
-
-      // Setup SidePanel UI structure
-      if (typeof SidePanel !== 'undefined') {
-        const sidePanelEnv = { container: layoutWrapper };
-        this.sidePanel = new SidePanel('left', 260, sidePanelEnv);
-
-        this.sidePanel.toolSettingsSection = this.sidePanel.addSection(
-          'setup',
-          'Tool Settings',
-          true
-        );
-        this.sidePanel.compassSection = this.sidePanel.addSection(
-          'compass',
-          'Compass Controls',
-          true
-        );
-        this.sidePanel.p2pSection = this.sidePanel.addSection(
-          'p2p',
-          'Controller',
-          false
-        );
-
-        this.baseController.sidePanel = this.sidePanel;
-        layoutWrapper.insertBefore(this.sidePanel.element, canvasContainer);
-        this._setupToolSettingsWatcher();
-
-        if (typeof CadStorageManager !== 'undefined') {
-          this.storageManager = new CadStorageManager(this.baseController);
-          this.storageManager.renderUI();
-        }
-
-        this.sidePanel.open();
-      }
-
-      // Initialize P2P Wireless Remote Connector
-      if (typeof P2PConnector !== 'undefined') {
-        this.baseController.p2pConnector = new P2PConnector(this.baseController);
-        if (this.sidePanel && this.sidePanel.p2pSection) {
-          this.baseController.p2pConnector.renderControls(
-            this.sidePanel.p2pSection
-          );
-        }
-      }
-
-      if (typeof ViewControlsManager !== 'undefined') {
-        const compassContainer = this.sidePanel
-          ? this.sidePanel.compassSection
-          : null;
-        ViewControlsManager.init(
-          this.baseController,
-          this.threeDView,
-          compassContainer
-        );
-      }
-
-      if (typeof KeyCommandHandler !== 'undefined') {
-        KeyCommandHandler.init();
-        if (typeof SmartDrawKeys !== 'undefined') {
-          SmartDrawKeys.initializeKeyCommands(
-            KeyCommandHandler,
-            this.baseController
-          );
-        }
-      }
-
-      if (typeof RotaryEncoders !== 'undefined') {
-        RotaryEncoders.initialize(this.baseController);
-      }
-
-      if (
-        localStorage.getItem('midi-controller-enabled') === 'true' &&
-        typeof MidiInputHandler !== 'undefined' &&
-        typeof MidiInputHandler.init === 'function'
-      ) {
-        MidiInputHandler.init((status) => {});
-      }
-
-      if (typeof CameraOrbitAnimator !== 'undefined') {
-        CameraOrbitAnimator.setDependencies(this.threeDView);
-      }
-
-      if (typeof DebugConfig !== 'undefined') {
-        if (DebugConfig.exposeThreeDView) globalThis.threeDView = this.threeDView;
-        if (DebugConfig.exposeBaseController)
-          globalThis.baseController = this.baseController;
-      }
-
-      if (env && typeof env.requestKeystrokeControl === 'function') {
-        env.requestKeystrokeControl((active) => {
-          if (this.baseController) {
-            this.baseController.isKeystrokeCaptureActive = active;
-          }
-          if (typeof KeyCommandHandler !== 'undefined') {
-            KeyCommandHandler.setPaused(!active);
-          }
-        });
-      } else {
-        if (this.baseController) {
-          this.baseController.isKeystrokeCaptureActive = true;
-        }
-      }
-
-      const initialRect = parentElement.getBoundingClientRect();
-      if (initialRect.width > 0 && initialRect.height > 0) {
-        this.app.resize(initialRect.width, initialRect.height);
-      }
-
-      console.log('[accuCad] Application initialized successfully.');
-      return this;
     }
+
+    const parentElement = env.container;
+    this.rootElement = parentElement;
+
+    const resetScroll = () => {
+      if (this.rootElement) {
+        this.rootElement.scrollLeft = 0;
+        this.rootElement.scrollTop = 0;
+      }
+      window.scrollTo(0, 0);
+      document.body.scrollLeft = 0;
+      document.body.scrollTop = 0;
+    };
+
+    this.rootElement.addEventListener('scroll', resetScroll);
+    window.addEventListener('scroll', resetScroll);
+    document.body.addEventListener('scroll', resetScroll);
+    this._scrollResetHandler = resetScroll;
+
+    const layoutWrapper = document.createElement('div');
+    layoutWrapper.id = 'accucad-layout-wrapper';
+    layoutWrapper.style.cssText =
+      'display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; position: relative;';
+    parentElement.appendChild(layoutWrapper);
+    this.layoutWrapper = layoutWrapper;
+
+    const canvasId = 'accucad-canvas-' + Math.random().toString(36).slice(2);
+    const canvasContainer = document.createElement('div');
+    canvasContainer.id = canvasId;
+    canvasContainer.style.cssText =
+      'flex-grow: 1; height: 100%; position: relative; overflow: hidden;';
+    layoutWrapper.appendChild(canvasContainer);
+    this.canvasContainer = canvasContainer;
+
+    if (
+      !parentElement._vibesAppResizeObserver &&
+      typeof ResizeObserver !== 'undefined'
+    ) {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (this.app && typeof this.app.resize === 'function') {
+            this.app.resize(entry.contentRect.width, entry.contentRect.height);
+          }
+        }
+      });
+      ro.observe(canvasContainer);
+      parentElement._vibesAppResizeObserver = ro;
+    }
+
+    const staticClasses = [
+      'CameraOrbitAnimator',
+      'DebugConfig',
+      'ElementOperations',
+      'ModelLoader',
+      'TentativePointHandler',
+      'ViewControlsManager',
+      'ViewManipulator',
+    ];
+    for (const clsName of staticClasses) {
+      const cls = window[clsName] || globalThis[clsName];
+      if (cls && typeof cls.initStatics === 'function') cls.initStatics();
+    }
+
+    if (typeof PopupBox !== 'undefined' && typeof PopupBox.init === 'function') {
+      PopupBox.init();
+    }
+
+    // accuCad does not need HDR environment reflections; disable environment map to eliminate 404
+    this.app = new ThreeJSLoader(canvasId, {
+      cameraPos: { x: 5, y: 5, z: 8 },
+      enableControls: false,
+      useThickLines: true,
+      commonLoaders: true,
+      environment: false,
+      lighting: true,
+      onUpdate: () => this._onUpdate?.(),
+    });
+
+    await this.app.init(canvasContainer);
+
+    this.THREE = this.app.THREE || window.THREE;
+    if (this.app.scene) {
+      this.app.scene.background = new this.THREE.Color(0x222222);
+    }
+
+    const target = new this.THREE.Vector3(0, 0.6, 0);
+    this.app.camera.lookAt(target);
+
+    this.threeDView = {
+      scene: this.app.scene,
+      camera: this.app.camera,
+      renderer: this.app.renderer,
+      target: target,
+      envRotation: 0,
+    };
+
+    this.baseController = new BaseController(
+      this.threeDView,
+      this.app.renderer.domElement
+    );
+    ControllerSetup.initializeController(
+      this.baseController,
+      this.threeDView.scene
+    );
+
+    // Setup SidePanel UI structure
+    if (typeof SidePanel !== 'undefined') {
+      const sidePanelEnv = { container: layoutWrapper };
+      this.sidePanel = new SidePanel('left', 260, sidePanelEnv);
+
+      this.sidePanel.toolSettingsSection = this.sidePanel.addSection(
+        'setup',
+        'Tool Settings',
+        true
+      );
+      this.sidePanel.compassSection = this.sidePanel.addSection(
+        'compass',
+        'Compass Controls',
+        true
+      );
+      this.sidePanel.p2pSection = this.sidePanel.addSection(
+        'p2p',
+        'Controller',
+        false
+      );
+
+      this.baseController.sidePanel = this.sidePanel;
+      layoutWrapper.insertBefore(this.sidePanel.element, canvasContainer);
+      this._setupToolSettingsWatcher();
+
+      if (typeof CadStorageManager !== 'undefined') {
+        this.storageManager = new CadStorageManager(this.baseController);
+        this.storageManager.renderUI();
+      }
+
+      this.sidePanel.open();
+    }
+
+    // Initialize P2P Wireless Remote Connector
+    if (typeof P2PConnector !== 'undefined') {
+      this.baseController.p2pConnector = new P2PConnector(this.baseController);
+      if (this.sidePanel && this.sidePanel.p2pSection) {
+        this.baseController.p2pConnector.renderControls(
+          this.sidePanel.p2pSection
+        );
+      }
+    }
+
+    if (typeof ViewControlsManager !== 'undefined') {
+      const compassContainer = this.sidePanel
+        ? this.sidePanel.compassSection
+        : null;
+      ViewControlsManager.init(
+        this.baseController,
+        this.threeDView,
+        compassContainer
+      );
+    }
+
+    if (typeof KeyCommandHandler !== 'undefined') {
+      KeyCommandHandler.init();
+      if (typeof SmartDrawKeys !== 'undefined') {
+        SmartDrawKeys.initializeKeyCommands(
+          KeyCommandHandler,
+          this.baseController
+        );
+      }
+    }
+
+    if (typeof RotaryEncoders !== 'undefined') {
+      RotaryEncoders.initialize(this.baseController);
+    }
+
+    if (
+      localStorage.getItem('midi-controller-enabled') === 'true' &&
+      typeof MidiInputHandler !== 'undefined' &&
+      typeof MidiInputHandler.init === 'function'
+    ) {
+      MidiInputHandler.init((status) => {});
+    }
+
+    if (typeof CameraOrbitAnimator !== 'undefined') {
+      CameraOrbitAnimator.setDependencies(this.threeDView);
+    }
+
+    if (typeof DebugConfig !== 'undefined') {
+      if (DebugConfig.exposeThreeDView) globalThis.threeDView = this.threeDView;
+      if (DebugConfig.exposeBaseController)
+        globalThis.baseController = this.baseController;
+    }
+
+    if (env && typeof env.requestKeystrokeControl === 'function') {
+      env.requestKeystrokeControl((active) => {
+        if (this.baseController) {
+          this.baseController.isKeystrokeCaptureActive = active;
+        }
+        if (typeof KeyCommandHandler !== 'undefined') {
+          KeyCommandHandler.setPaused(!active);
+        }
+      });
+    } else {
+      if (this.baseController) {
+        this.baseController.isKeystrokeCaptureActive = true;
+      }
+    }
+
+    const initialRect = parentElement.getBoundingClientRect();
+    if (initialRect.width > 0 && initialRect.height > 0) {
+      this.app.resize(initialRect.width, initialRect.height);
+    }
+
+    console.log('[accuCad] Application initialized successfully.');
+    return this;
+  }
   destroy() {
       console.log('[accuCad] destroy() called.');
 
