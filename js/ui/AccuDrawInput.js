@@ -1,68 +1,77 @@
 class AccuDrawInput {
+
   constructor(name, color, parentUi) {
-      this.name = name;
-      this.color = color;
-      this.parent = parentUi;
-      this.isLocked = false;
-      this.caretIndex = 0;
-      this.currentValueStr = '0.0000';
+    this.name = name;
+    this.color = color;
+    this.parent = parentUi;
+    this.isLocked = false;
+    this.caretIndex = 0;
+    this.currentValueStr = '0.0000';
 
-      this.outerElem = makeElement('div', {
-        className: 'accudrawInputContainer',
-        style: {
-          backgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, .4)`,
-          borderColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`,
-          top: '0px',
-        },
-      });
+    this.outerElem = makeElement('div', {
+      className: 'accudrawInputContainer',
+      style: {
+        backgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, .4)`,
+        borderColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`,
+        top: '0px',
+      },
+    });
 
-      // Pure CSS text box representation
-      this.inputElem = makeElement('div', {
-        className: 'accudrawInput',
-        style: {
-          lineHeight: '32px',
-          fontSize: '25px',
-          fontFamily: 'rounded, sans-serif',
-          textShadow: '2px 2px 2px #000',
-          color: '#eee',
-          paddingLeft: '8px',
-          userSelect: 'none',
-          pointerEvents: 'none',
-          position: 'absolute',
-          left: '0px',
-          top: '0px',
-          width: '100%',
-          height: '100%'
-        }
-      });
+    this.inputElem = makeElement('div', {
+      className: 'accudrawInput',
+      style: {
+        lineHeight: '32px',
+        fontSize: '25px',
+        fontFamily: 'rounded, sans-serif',
+        textShadow: '2px 2px 2px #000',
+        color: '#eee',
+        paddingLeft: '8px',
+        userSelect: 'none',
+        pointerEvents: 'none',
+        position: 'absolute',
+        left: '0px',
+        top: '0px',
+        width: '100%',
+        height: '100%'
+      }
+    });
 
-      this.textContainerElem = makeElement('div', {
-        style: {
-          display: 'inline-block',
-          width: '100%',
-          height: '100%'
-        }
-      });
-      this.inputElem.appendChild(this.textContainerElem);
+    this.textContainerElem = makeElement('div', {
+      style: {
+        display: 'inline-block',
+        width: '100%',
+        height: '100%'
+      }
+    });
+    this.inputElem.appendChild(this.textContainerElem);
 
-      this.lockColorElem = makeElement('div', { className: 'lockColor' });
-      this.lockImg = makeElement('img', {
-        src: 'https://sniplets.org/resources/lock.png',
-      });
+    this.lockColorElem = makeElement('div', { className: 'lockColor' });
 
-      this.lockElem = makeElement(
-        'div',
-        { className: 'lock' },
-        this.lockColorElem,
-        this.lockImg
-      );
+    // Self-contained inline SVG lock icon to prevent dead host resolution errors
+    const lockSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    lockSvg.setAttribute('viewBox', '0 0 24 24');
+    lockSvg.setAttribute('width', '22');
+    lockSvg.setAttribute('height', '26');
+    lockSvg.style.cssText = 'position: absolute; left: 3px; top: 3px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));';
+    lockSvg.innerHTML = `
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" fill="#ffd700" stroke="#000" stroke-width="1.5"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" fill="none" stroke="#ffd700" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="12" cy="16" r="1.5" fill="#000"/>
+      <path d="M12 17.5v2" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>
+    `;
 
-      this.outerElem.appendChild(this.inputElem);
-      this.outerElem.appendChild(this.lockElem);
-      
-      this.renderText();
-    }
+    this.lockElem = makeElement(
+      'div',
+      { className: 'lock' },
+      this.lockColorElem,
+      lockSvg
+    );
 
+    this.outerElem.appendChild(this.inputElem);
+    this.outerElem.appendChild(this.lockElem);
+
+    this.renderText();
+  }
   setValue(val) {
       let displayVal = val;
       if (typeof val === 'number') {
