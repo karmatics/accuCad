@@ -303,258 +303,273 @@ class EventHandlers {
   }
 
   static handleKeyDown(controller, event) {
-      if (controller.isKeystrokeCaptureActive === false) {
-        return;
-      }
+    if (controller.isKeystrokeCaptureActive === false) {
+      return;
+    }
 
-      const target = event.target;
-      const isTextInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-      if (isTextInput) {
-        return;
-      }
+    const target = event.target;
+    const isTextInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+    if (isTextInput) {
+      return;
+    }
 
-      if (event.key === 'Alt' || event.key === 'Meta') {
-        controller._ctrlDown = true;
-      }
-      if (event.key === 'Shift') {
-        controller._shiftDown = true;
-      }
+    if (event.key === 'Alt' || event.key === 'Meta') {
+      controller._ctrlDown = true;
+    }
+    if (event.key === 'Shift') {
+      controller._shiftDown = true;
+    }
 
-      const logic = controller.accuDrawLogic;
-      const activeInput = controller.accuDraw?.ui?.inputs?.find(i => i.name === logic?.currentAxis);
-      const diag = controller.accuDrawDiagnostics;
+    const logic = controller.accuDrawLogic;
+    const activeInput = controller.accuDraw?.ui?.inputs?.find(i => i.name === logic?.currentAxis);
+    const diag = controller.accuDrawDiagnostics;
 
-      if (logic && activeInput) {
-        // --- 1. NUMERICAL & DECIMAL INSETS ---
-        if (/[0-9.\-+]/.test(event.key) && event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
-          event.preventDefault();
-          event.stopPropagation();
+    if (logic && activeInput) {
+      // --- 1. NUMERICAL & DECIMAL INSETS ---
+      if (/[0-9.\-+]/.test(event.key) && event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
 
-          if (!logic.inputActive) {
-            logic.inputActive = true;
-            logic.stickyFocus = true;
-            logic.inputBuffer = '';
-            activeInput.caretIndex = 0;
-            if (!logic.typingMouseAnchor) {
-              logic.typingMouseAnchor = { ...logic.lastLocalDelta };
-            }
+        if (!logic.inputActive) {
+          logic.inputActive = true;
+          logic.stickyFocus = true;
+          logic.inputBuffer = '';
+          activeInput.caretIndex = 0;
+          if (!logic.typingMouseAnchor) {
+            logic.typingMouseAnchor = { ...logic.lastLocalDelta };
           }
+        }
 
+        const buffer = logic.inputBuffer || '';
+        const idx = activeInput.caretIndex;
+        const newBuffer = buffer.slice(0, idx) + event.key + buffer.slice(idx);
+
+        logic.inputBuffer = newBuffer;
+        activeInput.caretIndex = idx + 1;
+        logic.isLocked[logic.currentAxis] = true;
+        controller.accuDraw.ui.setLocked(logic.currentAxis, true);
+
+        if (diag) {
+          diag.logEvent('key:insert', `char="${event.key}" buffer="${newBuffer}" caret=${activeInput.caretIndex}`);
+        }
+
+        logic.onUiValueChange(logic.currentAxis, newBuffer);
+        activeInput.renderText();
+        return;
+      }
+
+      // --- 2. VALUE HISTORY CYCLING (ArrowUp / ArrowDown - Bentley parity) ---
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (logic && typeof logic.cycleValueHistory === 'function') {
+          logic.cycleValueHistory(logic.currentAxis, 1);
+        }
+        return;
+      }
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (logic && typeof logic.cycleValueHistory === 'function') {
+          logic.cycleValueHistory(logic.currentAxis, -1);
+        }
+        return;
+      }
+
+      // --- 3. THE CAD SMART BACKSPACE ---
+      if (event.key === 'Backspace') {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (logic.inputActive) {
           const buffer = logic.inputBuffer || '';
           const idx = activeInput.caretIndex;
-          const newBuffer = buffer.slice(0, idx) + event.key + buffer.slice(idx);
+          if (idx > 0) {
+            const newBuffer = buffer.slice(0, idx - 1) + buffer.slice(idx);
+            logic.inputBuffer = newBuffer;
+            activeInput.caretIndex = idx - 1;
 
-          logic.inputBuffer = newBuffer;
-          activeInput.caretIndex = idx + 1;
-          logic.isLocked[logic.currentAxis] = true;
-          controller.accuDraw.ui.setLocked(logic.currentAxis, true);
-
-          // LOG EVENT: keystroke tracking
-          if (diag) {
-            diag.logEvent('key:insert', `char="${event.key}" buffer="${newBuffer}" caret=${activeInput.caretIndex}`);
-          }
-
-          logic.onUiValueChange(logic.currentAxis, newBuffer);
-          activeInput.renderText();
-          return;
-        }
-
-        // --- 2. THE CAD SMART BACKSPACE ---
-        if (event.key === 'Backspace') {
-          event.preventDefault();
-          event.stopPropagation();
-
-          if (logic.inputActive) {
-            const buffer = logic.inputBuffer || '';
-            const idx = activeInput.caretIndex;
-            if (idx > 0) {
-              const newBuffer = buffer.slice(0, idx - 1) + buffer.slice(idx);
-              logic.inputBuffer = newBuffer;
-              activeInput.caretIndex = idx - 1;
-
-              // LOG EVENT: backspace tracking
-              if (diag) {
-                diag.logEvent('key:backspace', `buffer="${newBuffer}" caret=${activeInput.caretIndex}`);
-              }
-
-              if (newBuffer.length === 0) {
-                logic.inputActive = false;
-                logic.stickyFocus = false;
-                logic.isLocked[logic.currentAxis] = false;
-                controller.accuDraw.ui.setLocked(logic.currentAxis, false);
-                controller.refreshMousePosition();
-              } else {
-                logic.onUiValueChange(logic.currentAxis, newBuffer);
-              }
-              activeInput.renderText();
-            }
-          } else {
-            // Initiate Smart Edit from dynamic coordinate tracking
-            const currentVal = parseFloat(activeInput.currentValueStr);
-            if (!isNaN(currentVal)) {
-              let valStr = currentVal.toFixed(4);
-              if (valStr.endsWith('.0000')) {
-                valStr = Math.floor(currentVal).toString();
-              }
-              const truncatedStr = valStr.slice(0, -1);
-
-              logic.inputActive = true;
-              logic.stickyFocus = true;
-              logic.inputBuffer = truncatedStr;
-              activeInput.caretIndex = truncatedStr.length;
-              logic.isLocked[logic.currentAxis] = true;
-              controller.accuDraw.ui.setLocked(logic.currentAxis, true);
-
-              // LOG EVENT: smart edit tracking
-              if (diag) {
-                diag.logEvent('key:smart-backspace', `from="${valStr}" to="${truncatedStr}"`);
-              }
-
-              logic.onUiValueChange(logic.currentAxis, truncatedStr);
-              activeInput.renderText();
-            }
-          }
-          return;
-        }
-
-        // --- 3. DELETE CHARACTER ---
-        if (event.key === 'Delete') {
-          event.preventDefault();
-          event.stopPropagation();
-
-          if (logic.inputActive) {
-            const buffer = logic.inputBuffer || '';
-            const idx = activeInput.caretIndex;
-            if (idx < buffer.length) {
-              const newBuffer = buffer.slice(0, idx) + buffer.slice(idx + 1);
-              logic.inputBuffer = newBuffer;
-
-              // LOG EVENT: delete key
-              if (diag) {
-                diag.logEvent('key:delete', `buffer="${newBuffer}" caret=${activeInput.caretIndex}`);
-              }
-
-              if (newBuffer.length === 0) {
-                logic.inputActive = false;
-                logic.stickyFocus = false;
-                logic.isLocked[logic.currentAxis] = false;
-                controller.accuDraw.ui.setLocked(logic.currentAxis, false);
-                controller.refreshMousePosition();
-              } else {
-                logic.onUiValueChange(logic.currentAxis, newBuffer);
-              }
-              activeInput.renderText();
-            }
-          }
-          return;
-        }
-
-        // --- 4. NAVIGATION KEYS (Caret & Tab shifts) ---
-        if (event.key === 'ArrowLeft') {
-          if (logic.inputActive) {
-            event.preventDefault();
-            event.stopPropagation();
-            activeInput.caretIndex = Math.max(0, activeInput.caretIndex - 1);
-            
-            // LOG EVENT: caret navigation
             if (diag) {
-              diag.logEvent('key:arrow-left', `caret=${activeInput.caretIndex}`);
+              diag.logEvent('key:backspace', `buffer="${newBuffer}" caret=${activeInput.caretIndex}`);
             }
-            
+
+            if (newBuffer.length === 0) {
+              logic.inputActive = false;
+              logic.stickyFocus = false;
+              logic.isLocked[logic.currentAxis] = false;
+              controller.accuDraw.ui.setLocked(logic.currentAxis, false);
+              controller.refreshMousePosition();
+            } else {
+              logic.onUiValueChange(logic.currentAxis, newBuffer);
+            }
             activeInput.renderText();
           }
-          return;
-        }
+        } else {
+          const currentVal = parseFloat(activeInput.currentValueStr);
+          if (!isNaN(currentVal)) {
+            let valStr = currentVal.toFixed(4);
+            if (valStr.endsWith('.0000')) {
+              valStr = Math.floor(currentVal).toString();
+            }
+            const truncatedStr = valStr.slice(0, -1);
 
-        if (event.key === 'ArrowRight') {
-          if (logic.inputActive) {
-            event.preventDefault();
-            event.stopPropagation();
-            const buffer = logic.inputBuffer || '';
-            activeInput.caretIndex = Math.min(buffer.length, activeInput.caretIndex + 1);
-            
-            // LOG EVENT: caret navigation
+            logic.inputActive = true;
+            logic.stickyFocus = true;
+            logic.inputBuffer = truncatedStr;
+            activeInput.caretIndex = truncatedStr.length;
+            logic.isLocked[logic.currentAxis] = true;
+            controller.accuDraw.ui.setLocked(logic.currentAxis, true);
+
             if (diag) {
-              diag.logEvent('key:arrow-right', `caret=${activeInput.caretIndex}`);
+              diag.logEvent('key:smart-backspace', `from="${valStr}" to="${truncatedStr}"`);
             }
 
+            logic.onUiValueChange(logic.currentAxis, truncatedStr);
             activeInput.renderText();
           }
-          return;
-        }
-
-        if (event.key === 'Home') {
-          if (logic.inputActive) {
-            event.preventDefault();
-            event.stopPropagation();
-            activeInput.caretIndex = 0;
-            activeInput.renderText();
-          }
-          return;
-        }
-
-        if (event.key === 'End') {
-          if (logic.inputActive) {
-            event.preventDefault();
-            event.stopPropagation();
-            activeInput.caretIndex = (logic.inputBuffer || '').length;
-            activeInput.renderText();
-          }
-          return;
-        }
-
-        if (event.key === 'Enter') {
-          if (logic.inputActive) {
-            event.preventDefault();
-            event.stopPropagation();
-            
-            // LOG EVENT: enter confirmation
-            if (diag) {
-              diag.logEvent('key:enter', `confirmed="${logic.inputBuffer}" on ${logic.currentAxis}`);
-            }
-
-            logic.confirmInput();
-          }
-          return;
-        }
-      }
-
-      // --- GLOBAL FIELD NAVIGATION (Tab) ---
-      if (event.key === 'Tab') {
-        event.preventDefault();
-        event.stopPropagation();
-        const dir = event.shiftKey ? 'prev' : 'next';
-        
-        // LOG EVENT: field shift
-        if (diag) {
-          diag.logEvent('key:tab', `dir="${dir}"`);
-        }
-
-        if (controller.accuDraw?.ui && typeof controller.accuDraw.ui.navigateField === 'function') {
-          controller.accuDraw.ui.navigateField(dir);
         }
         return;
       }
 
-      // --- THE ACCUDRAW ESCAPE HIERARCHY ---
-      if (event.key === 'Escape') {
+      // --- 4. DELETE CHARACTER ---
+      if (event.key === 'Delete') {
         event.preventDefault();
         event.stopPropagation();
 
-        // Priority 1: Clear active typing and restore dynamic tracking
-        if (logic && logic.inputActive) {
-          // LOG EVENT: cancel typing
-          if (diag) {
-            diag.logEvent('lock:escape', `canceled typing on ${logic.currentAxis}`);
+        if (logic.inputActive) {
+          const buffer = logic.inputBuffer || '';
+          const idx = activeInput.caretIndex;
+          if (idx < buffer.length) {
+            const newBuffer = buffer.slice(0, idx) + buffer.slice(idx + 1);
+            logic.inputBuffer = newBuffer;
+
+            if (diag) {
+              diag.logEvent('key:delete', `buffer="${newBuffer}" caret=${activeInput.caretIndex}`);
+            }
+
+            if (newBuffer.length === 0) {
+              logic.inputActive = false;
+              logic.stickyFocus = false;
+              logic.isLocked[logic.currentAxis] = false;
+              controller.accuDraw.ui.setLocked(logic.currentAxis, false);
+              controller.refreshMousePosition();
+            } else {
+              logic.onUiValueChange(logic.currentAxis, newBuffer);
+            }
+            activeInput.renderText();
           }
+        }
+        return;
+      }
 
-          logic.inputActive = false;
-          logic.inputBuffer = '';
-          logic.stickyFocus = false;
-          logic.typingMouseAnchor = null;
+      // --- 5. NAVIGATION KEYS (Caret & Tab shifts) ---
+      if (event.key === 'ArrowLeft') {
+        if (logic.inputActive) {
+          event.preventDefault();
+          event.stopPropagation();
+          activeInput.caretIndex = Math.max(0, activeInput.caretIndex - 1);
+          if (diag) {
+            diag.logEvent('key:arrow-left', `caret=${activeInput.caretIndex}`);
+          }
+          activeInput.renderText();
+        }
+        return;
+      }
 
-          const currentAxis = logic.currentAxis;
+      if (event.key === 'ArrowRight') {
+        if (logic.inputActive) {
+          event.preventDefault();
+          event.stopPropagation();
+          const buffer = logic.inputBuffer || '';
+          activeInput.caretIndex = Math.min(buffer.length, activeInput.caretIndex + 1);
+          if (diag) {
+            diag.logEvent('key:arrow-right', `caret=${activeInput.caretIndex}`);
+          }
+          activeInput.renderText();
+        }
+        return;
+      }
+
+      if (event.key === 'Home') {
+        if (logic.inputActive) {
+          event.preventDefault();
+          event.stopPropagation();
+          activeInput.caretIndex = 0;
+          activeInput.renderText();
+        }
+        return;
+      }
+
+      if (event.key === 'End') {
+        if (logic.inputActive) {
+          event.preventDefault();
+          event.stopPropagation();
+          activeInput.caretIndex = (logic.inputBuffer || '').length;
+          activeInput.renderText();
+        }
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        if (logic.inputActive) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (diag) {
+            diag.logEvent('key:enter', `confirmed="${logic.inputBuffer}" on ${logic.currentAxis}`);
+          }
+          logic.confirmInput();
+        }
+        return;
+      }
+    }
+
+    // --- GLOBAL FIELD NAVIGATION (Tab) ---
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      event.stopPropagation();
+      const dir = event.shiftKey ? 'prev' : 'next';
+      if (diag) {
+        diag.logEvent('key:tab', `dir="${dir}"`);
+      }
+      if (controller.accuDraw?.ui && typeof controller.accuDraw.ui.navigateField === 'function') {
+        controller.accuDraw.ui.navigateField(dir);
+      }
+      return;
+    }
+
+    // --- THE ACCUDRAW ESCAPE HIERARCHY ---
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (logic && logic.inputActive) {
+        if (diag) {
+          diag.logEvent('lock:escape', `canceled typing on ${logic.currentAxis}`);
+        }
+        logic.inputActive = false;
+        logic.inputBuffer = '';
+        logic.stickyFocus = false;
+        logic.typingMouseAnchor = null;
+
+        const currentAxis = logic.currentAxis;
+        logic.isLocked[currentAxis] = false;
+        if (controller.accuDraw?.ui) {
+          controller.accuDraw.ui.setLocked(currentAxis, false);
+          controller.accuDraw.ui.focusField(currentAxis);
+        }
+        controller.refreshMousePosition();
+        return;
+      }
+
+      if (logic) {
+        const currentAxis = logic.currentAxis;
+        if (logic.isLocked[currentAxis]) {
+          if (diag) {
+            diag.logEvent('lock:escape', `unlocked ${currentAxis}`);
+          }
           logic.isLocked[currentAxis] = false;
+          logic.stickyFocus = false;
           if (controller.accuDraw?.ui) {
             controller.accuDraw.ui.setLocked(currentAxis, false);
             controller.accuDraw.ui.focusField(currentAxis);
@@ -562,52 +577,30 @@ class EventHandlers {
           controller.refreshMousePosition();
           return;
         }
+      }
 
-        // Priority 2: Unlock ONLY the currently active/focused field
-        if (logic) {
-          const currentAxis = logic.currentAxis;
-          if (logic.isLocked[currentAxis]) {
-            // LOG EVENT: unlock field
-            if (diag) {
-              diag.logEvent('lock:escape', `unlocked ${currentAxis}`);
-            }
-
-            logic.isLocked[currentAxis] = false;
-            logic.stickyFocus = false;
-            if (controller.accuDraw?.ui) {
-              controller.accuDraw.ui.setLocked(currentAxis, false);
-              controller.accuDraw.ui.focusField(currentAxis);
-            }
-            controller.refreshMousePosition();
-            return;
-          }
-        }
-
-        // Priority 3: Close active key command popups
-        if (controller._helpDialog) {
-          controller._helpDialog.close();
-          controller._helpDialog = null;
-          return;
-        }
-
-        // Priority 4: Reset active drawing tool
-        if (controller.activeCommand?.reset) {
-          controller.activeCommand.reset();
-        }
+      if (controller._helpDialog) {
+        controller._helpDialog.close();
+        controller._helpDialog = null;
         return;
       }
 
-      // Pass input to AccuDraw Logic (Alphabetical Shortcuts, etc)
-      if (controller.accuDrawLogic) {
-        const handled = controller.accuDrawLogic.handleInput(event.key);
-        if (handled) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
+      if (controller.activeCommand?.reset) {
+        controller.activeCommand.reset();
       }
+      return;
     }
 
+    // Pass input to AccuDraw Logic (Alphabetical Shortcuts, etc)
+    if (controller.accuDrawLogic) {
+      const handled = controller.accuDrawLogic.handleInput(event.key);
+      if (handled) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+    }
+  }
   static handleKeyUp(controller, event) {
       // Absolute Release: Bypass completely if capturing is disabled
       if (controller.isKeystrokeCaptureActive === false) {
@@ -626,93 +619,89 @@ class EventHandlers {
     }
 
   static _processSingleLeftClick(controller, event) {
-      const screenSize = [
-        controller.domElement.clientWidth,
-        controller.domElement.clientHeight,
-      ];
+    const screenSize = [
+      controller.domElement.clientWidth,
+      controller.domElement.clientHeight,
+    ];
 
-      // 1. Establish the "Raw" point (before AccuDraw constraints)
-      let rawPointToUse = null;
+    // 1. Establish the "Raw" point (before AccuDraw constraints)
+    let rawPointToUse = null;
 
-      if (controller._tentativeOriginalPoint) {
-        // If we have a tentative point, THAT is our raw input.
-        // (Ignoring the Z-lock projection for a moment, as we want the
-        // AccuDrawLogic to be the single source of truth for constraints)
-        rawPointToUse = controller._tentativeOriginalPoint;
-      } else {
-        // Fallback: Calculate from Mouse Ray
-        const markerSize = controller.originMarker
-          ? controller.originMarker.options.size
-          : 1;
-        const livePointData = GeneratePoint.generate({
-          clientPoint: [event.clientX, event.clientY],
-          domElement: controller.domElement,
-          size: screenSize,
-          camera: controller.view.camera,
-          origin: controller.origin,
-          planeNormal: controller.rotationMatrix[2],
-          indexEnabled: controller.indexEnabled,
-          indexTolerance: controller.indexTolerance,
-          rotationMatrix: controller.rotationMatrix,
-          markerSize: markerSize,
-        });
+    if (controller._tentativeOriginalPoint) {
+      rawPointToUse = controller._tentativeOriginalPoint;
+    } else {
+      const markerSize = controller.originMarker
+        ? controller.originMarker.options.size
+        : 1;
+      const livePointData = GeneratePoint.generate({
+        clientPoint: [event.clientX, event.clientY],
+        domElement: controller.domElement,
+        size: screenSize,
+        camera: controller.view.camera,
+        origin: controller.origin,
+        planeNormal: controller.rotationMatrix[2],
+        indexEnabled: controller.indexEnabled,
+        indexTolerance: controller.indexTolerance,
+        rotationMatrix: controller.rotationMatrix,
+        markerSize: markerSize,
+      });
 
-        rawPointToUse = livePointData.originProjectedPoint;
+      rawPointToUse = livePointData.originProjectedPoint;
 
-        // Apply soft snap/indexing logic if index is active.
-        // Bypassing this when isLocked is active causes the point to drift on click.
-        if (livePointData.indexedToAxis && livePointData.indexedPoint) {
-          rawPointToUse = livePointData.indexedPoint;
-        }
-      }
-
-      // 2. Apply AccuDraw Constraints
-      // This ensures the point we click matches what is shown by the index guide and Mini-Jack.
-      let finalPoint = rawPointToUse;
-
-      if (controller.accuDrawLogic) {
-        finalPoint = controller.accuDrawLogic.getConstrainedPoint(
-          rawPointToUse,
-          controller._tentativeOriginalPoint
-        );
-      }
-
-      // 3. Dispatch to Command
-      if (controller.activeCommand?.onPoint) {
-        controller.activeCommand.onPoint({
-          mode: 'click',
-          event: event,
-          screenPoint: [event.clientX, event.clientY],
-          rawPoint: rawPointToUse,
-          point: finalPoint,
-          screenSize: screenSize,
-          keys: { ctrl: event.altKey, shift: event.shiftKey },
-          view: controller.view.transformData,
-          indexedToAxis: null,
-        });
-
-        controller._storePoint({
-          pointData: {
-            targetProjectedPoint: finalPoint,
-            originProjectedPoint: finalPoint,
-            indexedPoint: finalPoint,
-            indexedToAxis: null,
-          },
-          view: controller.view.transformData,
-          screenSize: screenSize,
-          keys: { ctrl: event.altKey, shift: event.shiftKey },
-        });
-      }
-
-      // --- RESET LOGIC ---
-      // ALWAYS clear tentative point on click.
-      TentativePointHandler._clearTentativePoint(controller);
-
-      if (controller.accuDrawLogic) {
-        controller.accuDrawLogic.reset();
+      if (livePointData.indexedToAxis && livePointData.indexedPoint) {
+        rawPointToUse = livePointData.indexedPoint;
       }
     }
 
+    // 2. Apply AccuDraw Constraints
+    let finalPoint = rawPointToUse;
+
+    if (controller.accuDrawLogic) {
+      finalPoint = controller.accuDrawLogic.getConstrainedPoint(
+        rawPointToUse,
+        controller._tentativeOriginalPoint
+      );
+    }
+
+    // 3. Dispatch to Active Command
+    if (controller.activeCommand?.onPoint) {
+      controller.activeCommand.onPoint({
+        mode: 'click',
+        event: event,
+        screenPoint: [event.clientX, event.clientY],
+        rawPoint: rawPointToUse,
+        point: finalPoint,
+        screenSize: screenSize,
+        keys: { ctrl: event.altKey, shift: event.shiftKey },
+        view: controller.view.transformData,
+        indexedToAxis: null,
+      });
+
+      controller._storePoint({
+        pointData: {
+          targetProjectedPoint: finalPoint,
+          originProjectedPoint: finalPoint,
+          indexedPoint: finalPoint,
+          indexedToAxis: null,
+        },
+        view: controller.view.transformData,
+        screenSize: screenSize,
+        keys: { ctrl: event.altKey, shift: event.shiftKey },
+      });
+    }
+
+    // 4. Stream Final Point to Host Shell / CADCraft Parent Frame / MCP Agent
+    if (controller.compassDrawBridge && typeof controller.compassDrawBridge.dispatchPointToHost === 'function') {
+      controller.compassDrawBridge.dispatchPointToHost(finalPoint);
+    }
+
+    // 5. Reset Tentative Marker & Input Buffers
+    TentativePointHandler._clearTentativePoint(controller);
+
+    if (controller.accuDrawLogic) {
+      controller.accuDrawLogic.reset();
+    }
+  }
   static handleMouseUp(controller, event) {
       if (event.button === 0) {
         // Process Left single click instantly on release if chord timer is still active

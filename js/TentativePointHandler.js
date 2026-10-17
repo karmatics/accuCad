@@ -7,84 +7,134 @@ class TentativePointHandler {
   }
 
   static handleTentativePoint(controller, event) {
-    this.initStatics();
-    const canvas = controller.domElement;
-    const canvasRect = canvas.getBoundingClientRect();
-    if (canvasRect.width <= 0 || canvasRect.height <= 0) return;
+      this.initStatics();
+      const canvas = controller.domElement;
+      const canvasRect = canvas.getBoundingClientRect();
+      if (canvasRect.width <= 0 || canvasRect.height <= 0) return;
 
-    const mouse = new THREE.Vector2(
-      ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1,
-      -((event.clientY - canvasRect.top) / canvasRect.height) * 2 + 1
-    );
-
-    const camera = controller.view.camera;
-    const raycaster = new THREE.Raycaster();
-    raycaster.params.Line.threshold = 0.2;
-    raycaster.setFromCamera(mouse, camera);
-
-    // 1. Standard Raycast (Works great for Meshes/Solids)
-    const candidateObjects = this._getSnappableThreeObjects(controller);
-    const intersections = raycaster.intersectObjects(candidateObjects, true);
-
-    let ownerElement = null;
-
-    if (intersections.length > 0) {
-      // We hit something standard (likely a mesh)
-      const hitObject = intersections[0].object;
-      ownerElement = this._findOwnerElement(controller, hitObject);
-    }
-
-    // 2. Fallback: Screen-Space Wireframe Check
-    // If standard raycast failed (common for thin lines/paths), check if we are visually
-    // close to the line segments on screen. This is a "Thick Pick".
-    if (!ownerElement) {
-      ownerElement = this._findClosestElementByScreenSegments(
-        controller,
-        event.clientX,
-        event.clientY,
-        10 // 10 pixel tolerance for "touching" the line
-      );
-    }
-
-    // 3. Resolve Snap Point
-    let snapPoint = null;
-
-    if (ownerElement) {
-      // Highlighting logic: Cyan for "Found Element"
-      this._updateHighlighting(controller, ownerElement, 0x00ffff);
-
-      // Find closest vertex on THIS element only
-      const result = this._findClosestVertexScreenSpace(
-        controller,
-        ownerElement,
-        event.clientX,
-        event.clientY
+      const mouse = new THREE.Vector2(
+        ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1,
+        -((event.clientY - canvasRect.top) / canvasRect.height) * 2 + 1
       );
 
-      if (result) {
-        snapPoint = result.point;
-      } else if (
-        intersections.length > 0 &&
-        ownerElement ===
-          this._findOwnerElement(controller, intersections[0].object)
-      ) {
-        // If we had a real intersection on a mesh but no vertex close, snap to surface
-        snapPoint = intersections[0].point;
+      const camera = controller.view.camera;
+      const raycaster = new THREE.Raycaster();
+      raycaster.params.Line.threshold = 0.2;
+      raycaster.setFromCamera(mouse, camera);
+
+      // 1. Standard Raycast against candidate objects (including loaded GLB models)
+      const candidateObjects = this._getSnappableThreeObjects(controller);
+      const intersections = raycaster.intersectObjects(candidateObjects, true);
+
+      let ownerElement = null;
+      let hitIntersection = null;
+
+      if (intersections.length > 0) {
+        hitIntersection = intersections[0];
+        const hitObject = hitIntersection.object;
+        ownerElement = this._findOwnerElement(controller, hitObject);
+
+        // Handle loaded 3D model meshes that are not internal cadElements
+        if (!ownerElement && hitObject && hitObject.isMesh) {
+          ownerElement = {
+            threejsObject: hitObject,
+            isExternalModel: true,
+            type: 'mesh',
+            points: []
+          };
+        }
       }
+
+      // 2. Fallback: Screen-Space Wireframe Thick Pick
+      if (!ownerElement) {
+        ownerElement = this._findClosestElementByScreenSegments(
+          controller,
+          event.clientX,
+          event.clientY,
+          10
+        );
+      }
+
+      // 3. Resolve Snap Point and Surface Normal
+      let snapPoint = null;
+      let surfaceNormal = null;
+
+      if (ownerElement) {
+        this._updateHighlighting(controller, ownerElement, 0x00ffff);
+
+        // Check if we hit an external 3D mesh (such as an imported GLB model)
+        if (ownerElement.isExternalModel && hitIntersection && hitIntersection.face) {
+          const hitMesh = hitIntersection.object;
+          const geom = hitMesh.geometry;
+
+          // Transform face normal into 3D world space
+          const worldNormal = hitIntersection.face.normal.clone()
+            .transformDirection(hitMesh.matrixWorld)
+            .normalize();
+          surfaceNormal = [worldNormal.x, worldNormal.y, worldNormal.z];
+
+          // Evaluate triangle vertex proximity for magnetic vertex latching
+          if (geom && geom.attributes && geom.attributes.position) {
+            const pos = geom.attributes.position;
+            const vA = new THREE.Vector3().fromBufferAttribute(pos, hitIntersection.face.a).applyMatrix4(hitMesh.matrixWorld);
+            const vB = new THREE.Vector3().fromBufferAttribute(pos, hitIntersection.face.b).applyMatrix4(hitMesh.matrixWorld);
+            const vC = new THREE.Vector3().fromBufferAttribute(pos, hitIntersection.face.c).applyMatrix4(hitMesh.matrixWorld);
+
+            const dA = vA.distanceTo(hitIntersection.point);
+            const dB = vB.distanceTo(hitIntersection.point);
+            const dC = vC.distanceTo(hitIntersection.point);
+
+            const snapThreshold = 0.25 * (controller.accuDraw?.options?.size || 1.0);
+
+            if (dA < snapThreshold && dA <= dB && dA <= dC) {
+              snapPoint = [vA.x, vA.y, vA.z];
+            } else if (dB < snapThreshold && dB <= dA && dB <= dC) {
+              snapPoint = [vB.x, vB.y, vB.z];
+            } else if (dC < snapThreshold && dC <= dA && dC <= dB) {
+              snapPoint = [vC.x, vC.y, vC.z];
+            } else {
+              // Snap cleanly to the exact surface intersection point
+              snapPoint = [hitIntersection.point.x, hitIntersection.point.y, hitIntersection.point.z];
+            }
+          } else {
+            snapPoint = [hitIntersection.point.x, hitIntersection.point.y, hitIntersection.point.z];
+          }
+        } else {
+          // Standard CAD Element vertex snap
+          const result = this._findClosestVertexScreenSpace(
+            controller,
+            ownerElement,
+            event.clientX,
+            event.clientY
+          );
+
+          if (result) {
+            snapPoint = result.point;
+          } else if (hitIntersection) {
+            snapPoint = [hitIntersection.point.x, hitIntersection.point.y, hitIntersection.point.z];
+            if (hitIntersection.face) {
+              const worldNorm = hitIntersection.face.normal.clone()
+                .transformDirection(hitIntersection.object.matrixWorld)
+                .normalize();
+              surfaceNormal = [worldNorm.x, worldNorm.y, worldNorm.z];
+            }
+          }
+        }
+      }
+
+      // 4. Apply State & Surface Normal Anchor
+      if (ownerElement && snapPoint) {
+        controller._tentativeOriginalPoint = snapPoint;
+        controller._tentativeNormal = surfaceNormal;
+      } else {
+        this._updateHighlighting(controller, null);
+        controller._tentativeOriginalPoint = null;
+        controller._tentativeNormal = null;
+      }
+
+      this._updateTentativeMarker(controller, controller._tentativeOriginalPoint);
+      controller.refreshMousePosition();
     }
-
-    // 4. Apply Result
-    if (ownerElement && snapPoint) {
-      controller._tentativeOriginalPoint = snapPoint;
-    } else {
-      this._updateHighlighting(controller, null);
-      controller._tentativeOriginalPoint = null;
-    }
-
-    this._updateTentativeMarker(controller, controller._tentativeOriginalPoint);
-    controller.refreshMousePosition();
-  }
-
   // NEW: Helper to find elements by checking distance to their line segments in 2D
 
   static _collectCandidateObjects(controller) {
@@ -479,31 +529,31 @@ class TentativePointHandler {
   }
 
   static _clearTentativePoint(controller, suppressRefresh = false) {
-    if (controller.tentativeMarker) {
-      // Stop animation
-      controller.tentativeMarker.userData.isActive = false;
-      controller.view.scene.remove(controller.tentativeMarker);
-      controller.tentativeMarker = null;
-    }
-    if (controller.tentativeProjectionLine) {
-      controller.view.scene.remove(controller.tentativeProjectionLine);
-      controller.tentativeProjectionLine = null;
-    }
-    if (controller._highlightedElement) {
-      HighlightUtilities.removeHighlight(controller._highlightedElement);
-      controller._highlightedElement = null;
-    }
-    controller._tentativeOriginalPoint = null;
-    controller._tentativeProjectedPoint = null;
-    if (controller._tentativeTimeout) {
-      clearTimeout(controller._tentativeTimeout);
-      controller._tentativeTimeout = null;
-    }
-    if (!suppressRefresh) {
-      controller.refreshMousePosition();
-    }
-  }
+      if (controller.tentativeMarker) {
+        controller.tentativeMarker.userData.isActive = false;
+        controller.view.scene.remove(controller.tentativeMarker);
+        controller.tentativeMarker = null;
+      }
+      if (controller.tentativeProjectionLine) {
+        controller.view.scene.remove(controller.tentativeProjectionLine);
+        controller.tentativeProjectionLine = null;
+      }
+      if (controller._highlightedElement) {
+        HighlightUtilities.removeHighlight(controller._highlightedElement);
+        controller._highlightedElement = null;
+      }
+      controller._tentativeOriginalPoint = null;
+      controller._tentativeProjectedPoint = null;
+      controller._tentativeNormal = null;
 
+      if (controller._tentativeTimeout) {
+        clearTimeout(controller._tentativeTimeout);
+        controller._tentativeTimeout = null;
+      }
+      if (!suppressRefresh) {
+        controller.refreshMousePosition();
+      }
+    }
   static _findOwnerElement(controller, hitObject) {
     // Iterate through CAD elements to find which one owns the visual object
     for (const el of controller.cadElements) {
@@ -556,25 +606,42 @@ class TentativePointHandler {
       const activeCommand = controller.activeCommand;
       const tempElement = activeCommand ? activeCommand.tempElement : null;
 
+      // 1. Gather all active CAD elements in the document
       controller.cadElements.forEach((element) => {
         const isSelfSnap = (element === tempElement && activeCommand && activeCommand.allowSelfSnap);
 
-        // If self-snapping is active, do not skip the temporary element
         if (element === tempElement && !isSelfSnap) {
           return;
         }
 
         if (element.threejsObject) {
-          // Allow snapping to visible objects OR self-snapping to the hidden temporary element
           if (isSelfSnap || (!element.isTemporary && element.threejsObject.visible)) {
             snappableObjects.push(element.threejsObject);
           }
         }
       });
 
+      // 2. Ingest external loaded 3D assemblies (e.g. GLB models from ModelLoader)
+      if (typeof ModelLoader !== 'undefined' && ModelLoader.currentModel) {
+        snappableObjects.push(ModelLoader.currentModel);
+      }
+
+      // 3. Scan scene for any user meshes tagged as pickable
+      if (controller.view && controller.view.scene) {
+        controller.view.scene.traverse((child) => {
+          if (
+            child.isMesh &&
+            child.userData.isPickable !== false &&
+            !child.userData.isCompassPart &&
+            !snappableObjects.includes(child)
+          ) {
+            snappableObjects.push(child);
+          }
+        });
+      }
+
       return snappableObjects;
     }
-
   static _findClosestSnapPoint(controller, intersectionPoint) {
     let closestDistanceSq = Infinity;
     let bestSnap = null;

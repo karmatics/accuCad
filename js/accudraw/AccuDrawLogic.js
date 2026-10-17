@@ -207,139 +207,184 @@ class AccuDrawLogic {
   }
 
   handleInput(char) {
-      if (!this.active) return false;
-      const diag = this.baseController.accuDrawDiagnostics;
+    if (!this.active) return false;
+    const diag = this.baseController.accuDrawDiagnostics;
 
-      if (char === 'Escape') {
-        const isLocked =
-          this.isLocked.x ||
-          this.isLocked.y ||
-          this.isLocked.dist ||
-          this.isLocked.angle ||
-          this.isLocked.z;
-        const isTyping = this.inputActive;
+    if (char === 'Escape') {
+      const isLocked =
+        this.isLocked.x ||
+        this.isLocked.y ||
+        this.isLocked.dist ||
+        this.isLocked.angle ||
+        this.isLocked.z;
+      const isTyping = this.inputActive;
 
-        if (isLocked || isTyping) {
-          if (diag)
-            diag.logEvent(
-              'escape',
-              'clear all locks' +
-                (isTyping ? ' + cancel typing "' + this.inputBuffer + '"' : '')
-            );
-          this.inputActive = false;
-          this.inputBuffer = '';
-          this.stickyFocus = false;
-          this.typingMouseAnchor = null;
-          this.isLocked.x = false;
-          this.isLocked.y = false;
-          this.isLocked.z = false;
-          this.isLocked.dist = false;
-          this.isLocked.angle = false;
-          this.updateUiLocks();
-          this.baseController.refreshMousePosition();
-          return true;
-        }
-        return false;
-      }
-
-      if (char === 'Tab') {
-        if (this.inputActive) {
-          if (diag)
-            diag.logEvent(
-              'tab',
-              'confirm "' +
-                this.inputBuffer +
-                '" on ' +
-                this.currentAxis +
-                ', then switch'
-            );
-          this.confirmInput();
-        }
-        this.stickyFocus = true;
-        this.typingMouseAnchor = null;
-        const prevAxis = this.currentAxis;
-        if (this.mode === 'rectangular') {
-          this.currentAxis = this.currentAxis === 'x' ? 'y' : 'x';
-        } else if (this.mode === 'polar') {
-          this.currentAxis = this.currentAxis === 'dist' ? 'angle' : 'dist';
-        } else {
-          const order = ['x', 'y', 'dist', 'angle'];
-          const idx = order.indexOf(this.currentAxis);
-          this.currentAxis = order[(idx + 1) % order.length];
-        }
-        if (diag) diag.logEvent('tab', prevAxis + ' → ' + this.currentAxis);
-        this.inputActive = false;
-        this.inputBuffer = '';
-        if (this.baseController.accuDraw && this.baseController.accuDraw.ui) {
-          this.baseController.accuDraw.ui.focusField(this.currentAxis);
-        }
-        return true;
-      }
-
-      if (/[0-9.\-+]/.test(char)) {
-        if (!this.inputActive) {
-          this.inputBuffer = '';
-          this.inputActive = true;
-          this.stickyFocus = true;
-          this.typingMouseAnchor = { ...this.lastLocalDelta };
-          if (diag)
-            diag.logEvent(
-              'typing:start',
-              'axis=' +
-                this.currentAxis +
-                ' char="' +
-                char +
-                '" anchor=(' +
-                this.lastLocalDelta.x.toFixed(3) +
-                ',' +
-                this.lastLocalDelta.y.toFixed(3) +
-                ')'
-            );
-        }
-
-        this.inputBuffer += char;
-
-        let val = parseFloat(this.inputBuffer);
-        if (!isNaN(val)) {
-          if (this.mode === 'rectangular') {
-            const delta =
-              this.currentAxis === 'x'
-                ? this.lastLocalDelta.x
-                : this.lastLocalDelta.y;
-            if (val > 0 && delta < 0) {
-              val = -val;
-            }
-          } else if (this.currentAxis === 'angle') {
-            const delta = this.lastLocalDelta.angle;
-            if (val > 0 && delta < 0) {
-              val = -val;
-            }
-          }
-          this.lockedValues[this.currentAxis] = val;
-        } else {
-          if (this.inputBuffer !== '-' && this.inputBuffer !== '.') {
-            this.lockedValues[this.currentAxis] = 0;
-          }
-        }
-
-        this.isLocked[this.currentAxis] = true;
-
+      if (isLocked || isTyping) {
         if (diag)
           diag.logEvent(
-            'typing:char',
-            '"' +
-              this.inputBuffer +
-              '" → lock ' +
-              this.currentAxis +
-              '=' +
-              this.lockedValues[this.currentAxis]
+            'escape',
+            'clear all locks' +
+              (isTyping ? ' + cancel typing "' + this.inputBuffer + '"' : '')
           );
+        this.inputActive = false;
+        this.inputBuffer = '';
+        this.stickyFocus = false;
+        this.typingMouseAnchor = null;
+        this.isLocked.x = false;
+        this.isLocked.y = false;
+        this.isLocked.z = false;
+        this.isLocked.dist = false;
+        this.isLocked.angle = false;
+        this.updateUiLocks();
+        this.baseController.refreshMousePosition();
+        return true;
+      }
+      return false;
+    }
+
+    if (char === 'Tab') {
+      if (this.inputActive) {
+        if (diag)
+          diag.logEvent(
+            'tab',
+            'confirm "' +
+              this.inputBuffer +
+              '" on ' +
+              this.currentAxis +
+              ', then switch'
+          );
+        this.confirmInput();
+      }
+      this.stickyFocus = true;
+      this.typingMouseAnchor = null;
+      const prevAxis = this.currentAxis;
+      if (this.mode === 'rectangular') {
+        this.currentAxis = this.currentAxis === 'x' ? 'y' : 'x';
+      } else if (this.mode === 'polar') {
+        this.currentAxis = this.currentAxis === 'dist' ? 'angle' : 'dist';
+      } else {
+        const order = ['x', 'y', 'dist', 'angle'];
+        const idx = order.indexOf(this.currentAxis);
+        this.currentAxis = order[(idx + 1) % order.length];
+      }
+      if (diag) diag.logEvent('tab', prevAxis + ' → ' + this.currentAxis);
+      this.inputActive = false;
+      this.inputBuffer = '';
+      if (this.baseController.accuDraw && this.baseController.accuDraw.ui) {
+        this.baseController.accuDraw.ui.focusField(this.currentAxis);
+      }
+      return true;
+    }
+
+    if (/[0-9.\-+]/.test(char)) {
+      if (!this.inputActive) {
+        this.inputBuffer = '';
+        this.inputActive = true;
+        this.stickyFocus = true;
+        this.typingMouseAnchor = { ...this.lastLocalDelta };
+        if (diag)
+          diag.logEvent(
+            'typing:start',
+            'axis=' +
+              this.currentAxis +
+              ' char="' +
+              char +
+              '" anchor=(' +
+              this.lastLocalDelta.x.toFixed(3) +
+              ',' +
+              this.lastLocalDelta.y.toFixed(3) +
+              ')'
+          );
+      }
+
+      this.inputBuffer += char;
+
+      let val = parseFloat(this.inputBuffer);
+      if (!isNaN(val)) {
+        // Apply iTwin-parity SmartKeyin directional inference
+        val = this.inferDirectionalSign(this.currentAxis, val);
+        this.lockedValues[this.currentAxis] = val;
+      } else {
+        if (this.inputBuffer !== '-' && this.inputBuffer !== '.') {
+          this.lockedValues[this.currentAxis] = 0;
+        }
+      }
+
+      this.isLocked[this.currentAxis] = true;
+
+      if (diag)
+        diag.logEvent(
+          'typing:char',
+          '"' +
+            this.inputBuffer +
+            '" → lock ' +
+            this.currentAxis +
+            '=' +
+            this.lockedValues[this.currentAxis]
+        );
+
+      if (this.baseController.accuDraw && this.baseController.accuDraw.ui) {
+        this.baseController.accuDraw.ui.setLocked(this.currentAxis, true);
+        this.baseController.accuDraw.ui.updateValues({
+          [this.currentAxis]: this.inputBuffer,
+        });
+      }
+
+      if (this.baseController.refreshMousePosition) {
+        this.baseController.refreshMousePosition();
+      }
+      return true;
+    }
+
+    if (char === 'Backspace') {
+      if (this.inputActive) {
+        const prev = this.inputBuffer;
+        this.inputBuffer = this.inputBuffer.slice(0, -1);
+
+        if (this.inputBuffer.length === 0) {
+          if (diag)
+            diag.logEvent(
+              'typing:clear',
+              'backspaced from "' +
+                prev +
+                '" - cancel typing on ' +
+                this.currentAxis
+            );
+          this.inputActive = false;
+          this.stickyFocus = false;
+          this.typingMouseAnchor = null;
+          this.isLocked[this.currentAxis] = false;
+          this.lockedValues[this.currentAxis] = 0;
+        } else {
+          let val = parseFloat(this.inputBuffer);
+          if (!isNaN(val)) {
+            val = this.inferDirectionalSign(this.currentAxis, val);
+            this.lockedValues[this.currentAxis] = val;
+          } else {
+            this.lockedValues[this.currentAxis] = 0;
+          }
+          if (diag)
+            diag.logEvent(
+              'typing:backspace',
+              '"' +
+                prev +
+                '" → "' +
+                this.inputBuffer +
+                '" lock=' +
+                this.lockedValues[this.currentAxis]
+            );
+        }
 
         if (this.baseController.accuDraw && this.baseController.accuDraw.ui) {
-          this.baseController.accuDraw.ui.setLocked(this.currentAxis, true);
           this.baseController.accuDraw.ui.updateValues({
-            [this.currentAxis]: this.inputBuffer,
+            [this.currentAxis]: this.inputActive
+              ? this.inputBuffer
+              : this.lastLocalDelta[this.currentAxis],
           });
+          this.baseController.accuDraw.ui.setLocked(
+            this.currentAxis,
+            this.isLocked[this.currentAxis]
+          );
         }
 
         if (this.baseController.refreshMousePosition) {
@@ -347,80 +392,10 @@ class AccuDrawLogic {
         }
         return true;
       }
-
-      if (char === 'Backspace') {
-        if (this.inputActive) {
-          const prev = this.inputBuffer;
-          this.inputBuffer = this.inputBuffer.slice(0, -1);
-
-          if (this.inputBuffer.length === 0) {
-            if (diag)
-              diag.logEvent(
-                'typing:clear',
-                'backspaced from "' +
-                  prev +
-                  '" - cancel typing on ' +
-                  this.currentAxis
-              );
-            this.inputActive = false;
-            this.stickyFocus = false;
-            this.typingMouseAnchor = null;
-            this.isLocked[this.currentAxis] = false;
-            this.lockedValues[this.currentAxis] = 0;
-          } else {
-            let val = parseFloat(this.inputBuffer);
-            if (!isNaN(val)) {
-              if (this.mode === 'rectangular') {
-                const delta =
-                  this.currentAxis === 'x'
-                    ? this.lastLocalDelta.x
-                    : this.lastLocalDelta.y;
-                if (val > 0 && delta < 0) {
-                  val = -val;
-                }
-              } else if (this.currentAxis === 'angle') {
-                const delta = this.lastLocalDelta.angle;
-                if (val > 0 && delta < 0) {
-                  val = -val;
-                }
-              }
-              this.lockedValues[this.currentAxis] = val;
-            } else {
-              this.lockedValues[this.currentAxis] = 0;
-            }
-            if (diag)
-              diag.logEvent(
-                'typing:backspace',
-                '"' +
-                  prev +
-                  '" → "' +
-                  this.inputBuffer +
-                  '" lock=' +
-                  this.lockedValues[this.currentAxis]
-              );
-          }
-
-          if (this.baseController.accuDraw && this.baseController.accuDraw.ui) {
-            this.baseController.accuDraw.ui.updateValues({
-              [this.currentAxis]: this.inputActive
-                ? this.inputBuffer
-                : this.lastLocalDelta[this.currentAxis],
-            });
-            this.baseController.accuDraw.ui.setLocked(
-              this.currentAxis,
-              this.isLocked[this.currentAxis]
-            );
-          }
-
-          if (this.baseController.refreshMousePosition) {
-            this.baseController.refreshMousePosition();
-          }
-          return true;
-        }
-      }
-
-      return false;
     }
+
+    return false;
+  }
 
   confirmInput() {
     const diag = this.baseController.accuDrawDiagnostics;
@@ -447,6 +422,22 @@ class AccuDrawLogic {
     if (!isNaN(val)) {
       this.lockedValues[axis] = val;
       this.isLocked[axis] = true;
+
+      // Record into Value Memory Stack (Bentley iTwin parity: choosePreviousValue ring buffer)
+      if (!this.valueHistory) {
+        this.valueHistory = { x: [], y: [], z: [], dist: [], angle: [] };
+      }
+      if (!this.valueHistory[axis]) {
+        this.valueHistory[axis] = [];
+      }
+      if (this.valueHistory[axis][0] !== val) {
+        this.valueHistory[axis].unshift(val);
+        if (this.valueHistory[axis].length > 20) {
+          this.valueHistory[axis].pop();
+        }
+      }
+      if (!this.historyIndex) this.historyIndex = {};
+      this.historyIndex[axis] = -1;
     }
     this.updateUiLocks();
 
@@ -456,7 +447,6 @@ class AccuDrawLogic {
       });
     }
   }
-
   toggleLock(axis) {
     if (this.mode === 'rectangular' && (axis === 'dist' || axis === 'angle'))
       return;
@@ -492,9 +482,12 @@ class AccuDrawLogic {
     this.inputBuffer = '';
     this.stickyFocus = false;
     this.typingMouseAnchor = null;
+
+    if (!this.historyIndex) this.historyIndex = {};
+    ['x', 'y', 'z', 'dist', 'angle'].forEach(k => { this.historyIndex[k] = -1; });
+
     this.updateUiLocks();
   }
-
   updateUiLocks() {
     if (this.baseController.accuDraw && this.baseController.accuDraw.ui) {
       this.baseController.accuDraw.ui.setLocked('x', this.isLocked.x);
@@ -700,5 +693,74 @@ class AccuDrawLogic {
         this.baseController.accuDraw.setSquircleAnimated(shapeVal, 0.3);
       }
     }
+
+  inferDirectionalSign(axis, value) {
+    // Direct parity with Bentley iTwin AccuDraw.ts smartKeyin algorithm:
+    // Evaluates the physical direction of mouse movement relative to the floating origin.
+    // If the user pulled the cursor along a negative direction and entered a positive scalar,
+    // automatically apply the negative sign.
+    if (typeof value !== 'number' || isNaN(value)) return 0;
+    if (value < 0) return value; // Explicit user sign preserved
+
+    let delta = 0;
+    if (axis === 'x') {
+      delta = this.lastLocalDelta.x;
+    } else if (axis === 'y') {
+      delta = this.lastLocalDelta.y;
+    } else if (axis === 'z') {
+      delta = this.lastLocalDelta.z;
+    } else if (axis === 'angle') {
+      delta = this.lastLocalDelta.angle;
+    }
+
+    // If cursor is displaced in the negative direction, negate the scalar
+    if (delta < -0.000001) {
+      return -value;
+    }
+    return value;
+  }
+
+  cycleValueHistory(axis, direction = 1) {
+    // Direct parity with Bentley AccuDrawTool.ts: choosePreviousValue / chooseNextValue
+    // Cycles the ring buffer of previously confirmed values on this specific axis.
+    if (!this.valueHistory || !this.valueHistory[axis] || this.valueHistory[axis].length === 0) {
+      return false;
+    }
+
+    const history = this.valueHistory[axis];
+    if (!this.historyIndex) this.historyIndex = {};
+    if (this.historyIndex[axis] === undefined) this.historyIndex[axis] = -1;
+
+    let nextIdx = this.historyIndex[axis] + direction;
+    if (nextIdx < 0) nextIdx = history.length - 1;
+    if (nextIdx >= history.length) nextIdx = 0;
+
+    this.historyIndex[axis] = nextIdx;
+    const recalledVal = history[nextIdx];
+
+    this.inputActive = true;
+    this.stickyFocus = true;
+    this.inputBuffer = recalledVal.toString();
+    this.lockedValues[axis] = recalledVal;
+    this.isLocked[axis] = true;
+
+    const diag = this.baseController.accuDrawDiagnostics;
+    if (diag) {
+      diag.logEvent('valueHistory:cycle', `${axis} [${nextIdx + 1}/${history.length}] = ${recalledVal}`);
+    }
+
+    if (this.baseController.accuDraw && this.baseController.accuDraw.ui) {
+      this.baseController.accuDraw.ui.setLocked(axis, true);
+      this.baseController.accuDraw.ui.updateValues({ [axis]: this.inputBuffer });
+      const input = this.baseController.accuDraw.ui.inputs?.find(i => i.name === axis);
+      if (input) {
+        input.caretIndex = this.inputBuffer.length;
+        input.renderText();
+      }
+    }
+
+    this.baseController.refreshMousePosition();
+    return true;
+  }
 }
 

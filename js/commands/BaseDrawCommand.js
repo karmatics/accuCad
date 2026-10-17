@@ -48,5 +48,19 @@ class BaseDrawCommand {
     this.reset();
   }
 
+  sendHint(hintOptions = {}) {
+    // Dispatches geometric context hints (origin, orientation, distance, angle locks)
+    // to the active AccuDraw compass via CompassDrawBridge (Bentley iTwin HintBuilder contract)
+    if (this.base && this.base.compassDrawBridge) {
+      const builder = this.base.compassDrawBridge.createHintBuilder();
+      if (hintOptions.origin) builder.setOrigin(hintOptions.origin);
+      if (hintOptions.rotation) builder.setRotation(hintOptions.rotation);
+      if (hintOptions.xAxis) builder.setXAxis(hintOptions.xAxis);
+      if (typeof hintOptions.lockDistance === 'number') builder.setLockDistance(hintOptions.lockDistance);
+      if (typeof hintOptions.lockAngle === 'number') builder.setLockAngle(hintOptions.lockAngle);
+      if (hintOptions.mode) builder.setMode(hintOptions.mode);
+      builder.sendHints(true);
+    }
+  }
 }
 

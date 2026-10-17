@@ -262,4 +262,28 @@ class DrawCapsuleCommand {
     this.allowSelfSnap = false;
   }
 
+  getCommandSettings() {
+    return [
+      {
+        id: 'capsuleRadius',
+        label: 'Capsule Radius',
+        type: 'slider',
+        min: 0.05,
+        max: 2.0,
+        step: 0.05,
+        value: this.tempElement ? this.tempElement.radius : (this.base.commandControlValue || 0.3),
+        callback: (val) => {
+          this.base.commandControlValue = val;
+          if (this.tempElement && this.tempElement.isTemporary) {
+            this.tempElement.radius = val;
+            this.tempElement.updateDimensions();
+            if (this.tempElement.end) {
+              this.updatePreview(this.tempElement.end);
+            }
+          }
+          this.base.refreshMousePosition();
+        }
+      }
+    ];
+  }
 }

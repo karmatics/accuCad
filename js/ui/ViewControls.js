@@ -51,253 +51,287 @@ class ViewControls {
     }
 
   _createCompassControls() {
-      const hostContainer = this.baseController?.domElement?.parentElement || document.body;
+        const hostContainer = this.baseController?.domElement?.parentElement || document.body;
 
-      this.rotations = { x: 0, y: 0, z: 0 };
-      const savedSettings = this._loadSettings();
+        this.rotations = { x: 0, y: 0, z: 0 };
+        const savedSettings = this._loadSettings();
 
-      this._isProgrammaticReset = true;
+        this._isProgrammaticReset = true;
 
-      if (this.customCompassContainer) {
-        this.compassBox = {
-          element: this.customCompassContainer,
-          contentElement: this.customCompassContainer
-        };
-      } else {
-        const parentHeight = hostContainer.clientHeight || window.innerHeight;
-        const compassTop = Math.max(20, parentHeight - 485);
+        if (this.customCompassContainer) {
+          this.compassBox = {
+            element: this.customCompassContainer,
+            contentElement: this.customCompassContainer
+          };
+        } else {
+          const parentHeight = hostContainer.clientHeight || window.innerHeight;
+          const compassTop = Math.max(20, parentHeight - 485);
 
-        this.compassBox = UITools.makeDialog({
-          stateId: 'accuCad-compassBox',
-          title: 'Compass Controls',
-          width: '225px',
-          height: 'auto',
-          position: [20, compassTop], 
-          titleBarAtBottom: false,
-          transparent: true,
-          allowMaximize: false,
-          noPadding: true,
-          appendTo: hostContainer,
-        });
+          this.compassBox = UITools.makeDialog({
+            stateId: 'accuCad-compassBox',
+            title: 'Compass Controls',
+            width: '225px',
+            height: 'auto',
+            position: [20, compassTop], 
+            titleBarAtBottom: false,
+            transparent: true,
+            allowMaximize: false,
+            noPadding: true,
+            appendTo: hostContainer,
+          });
 
-        this.compassBox.contentElement.style.overflow = 'hidden';
-        this.compassBox.contentElement.style.padding = '4px 6px 6px 6px';
-      }
+          this.compassBox.contentElement.style.overflow = 'hidden';
+          this.compassBox.contentElement.style.padding = '4px 6px 6px 6px';
+        }
 
-      this.sliders.size = new SliderControl({
-        label: 'size',
-        min: 10,
-        max: 500,
-        initialValue: savedSettings.size !== undefined ? savedSettings.size : 60,
-        showValue: true,
-        callback: (val) => {
-          const rounded = Number(val.toFixed(0));
-          this._applyCompassSetting('size', rounded);
-          this._saveSetting('size', rounded);
-        },
-      });
-      this.compassBox.contentElement.appendChild(this.sliders.size.container);
-
-      const compassColorContainer = document.createElement('div');
-      compassColorContainer.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 4px 0; margin-bottom: 8px;';
-      
-      const compassColorLabel = document.createElement('div');
-      compassColorLabel.style.cssText = 'font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold;';
-      compassColorLabel.textContent = 'color';
-      
-      const compassSwatch = document.createElement('div');
-      compassSwatch.className = 'compass-color-swatch-picker';
-      const initialCompassColor = savedSettings.hexColor || '#88ccff';
-      this._compassColorHex = this._colorToHexStr(initialCompassColor);
-      compassSwatch.style.cssText = `width: 42px; height: 20px; border-radius: 4px; background-color: ${this._compassColorHex}; border: 1px solid #555; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.5);`;
-      this.compassSwatch = compassSwatch;
-
-      compassSwatch.onclick = (e) => {
-        e.stopPropagation();
-        const picker = new ColorPicker();
-        picker.openSmartPicker(compassSwatch, this._compassColorHex || '#88ccff', (newColor) => {
-          compassSwatch.style.backgroundColor = newColor;
-          this._compassColorHex = this._colorToHexStr(newColor);
-          
-          const rgbNum = this._colorToRgbNum(newColor);
-          if (this.baseController.accuDraw?.update) {
-            this.baseController.accuDraw.update({ color: rgbNum });
-          }
-          this._saveSetting('hexColor', this._compassColorHex);
-        });
-      };
-      
-      compassColorContainer.appendChild(compassColorLabel);
-      compassColorContainer.appendChild(compassSwatch);
-      this.compassBox.contentElement.appendChild(compassColorContainer);
-
-      this.sliders.opa = new SliderControl({
-        label: 'transparency',
-        min: 0,
-        max: 1,
-        initialValue: savedSettings.opa !== undefined ? savedSettings.opa : 1,
-        showValue: true,
-        callback: (val) => {
-          const rounded = Number(val.toFixed(2));
-          this._applyCompassSetting('transparency', rounded);
-          this._saveSetting('opa', rounded);
-        },
-      });
-      this.compassBox.contentElement.appendChild(this.sliders.opa.container);
-
-      this.sliders.sqrcl = new SliderControl({
-        label: 'square or circle',
-        min: 0,
-        max: 1,
-        initialValue: savedSettings.sqrcl !== undefined ? savedSettings.sqrcl : 0.5,
-        showValue: true,
-        callback: (val) => {
-          const rounded = Number(val.toFixed(2));
-          this._applyCompassSetting('square or circle', rounded);
-          this._saveSetting('sqrcl', rounded);
-        },
-      });
-      this.compassBox.contentElement.appendChild(this.sliders.sqrcl.container);
-
-      ['x', 'y', 'z'].forEach((axis) => {
-        this.sliders[`${axis}rot`] = new SliderControl({
-          label: `${axis} rotation`,
-          min: -90,
-          max: 90,
-          initialValue: 0,
-          saveToLocalStorage: false,
-          relativeMidi: true,
+        this.sliders.size = new SliderControl({
+          label: 'size',
+          min: 10,
+          max: 500,
+          initialValue: savedSettings.size !== undefined ? savedSettings.size : 60,
           showValue: true,
-          directEntry: true,
-          callback: (val) =>
-            this._applyCompassSetting(`${axis} rotation`, Math.round(val)),
+          callback: (val) => {
+            const rounded = Number(val.toFixed(0));
+            this._applyCompassSetting('size', rounded);
+            this._saveSetting('size', rounded);
+          },
         });
-        this.compassBox.contentElement.appendChild(
-          this.sliders[`${axis}rot`].container
-        );
-      });
+        this.compassBox.contentElement.appendChild(this.sliders.size.container);
 
-      this.sliders.bg = new SliderControl({
-        label: 'background',
-        min: 0,
-        max: 255,
-        initialValue: savedSettings.bg !== undefined ? savedSettings.bg : 34,
-        showValue: true,
-        callback: (val) => {
-          const rounded = Math.round(val);
-          this._applyCompassSetting('background', rounded);
-          this._saveSetting('bg', rounded);
-        },
-      });
-      this.compassBox.contentElement.appendChild(this.sliders.bg.container);
+        const compassColorContainer = document.createElement('div');
+        compassColorContainer.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 4px 0; margin-bottom: 8px;';
 
-      this.sliders.accudrawZ = new SliderControl({
-        label: 'accudraw Z position',
-        isInfiniteWheel: true,
-        saveToLocalStorage: false,
-        callback: (val) => {
-          const currentOrigin = this.baseController.origin;
-          const delta = typeof window.zMoveDelta !== 'undefined' ? window.zMoveDelta : 0.002;
-          const rm = this.baseController.rotationMatrix;
-          const zAxis = rm[2];
-          const displacement = zAxis.map((component) => component * val * delta * 1.5);
-          const newOrigin = [
-            currentOrigin[0] + displacement[0],
-            currentOrigin[1] + displacement[1],
-            currentOrigin[2] + displacement[2],
-          ];
-          this.baseController.setOrigin(newOrigin);
-        }
-      });
-      this.compassBox.contentElement.appendChild(this.sliders.accudrawZ.container);
+        const compassColorLabel = document.createElement('div');
+        compassColorLabel.style.cssText = 'font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold;';
+        compassColorLabel.textContent = 'color';
 
-      this._isProgrammaticReset = false;
+        const compassSwatch = document.createElement('div');
+        compassSwatch.className = 'compass-color-swatch-picker';
+        const initialCompassColor = savedSettings.hexColor || '#88ccff';
+        this._compassColorHex = this._colorToHexStr(initialCompassColor);
+        compassSwatch.style.cssText = `width: 42px; height: 20px; border-radius: 4px; background-color: ${this._compassColorHex}; border: 1px solid #555; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.5);`;
+        this.compassSwatch = compassSwatch;
 
-      this._applyAllSavedSettings(savedSettings);
+        compassSwatch.onclick = (e) => {
+          e.stopPropagation();
+          const picker = new ColorPicker();
+          picker.openSmartPicker(compassSwatch, this._compassColorHex || '#88ccff', (newColor) => {
+            compassSwatch.style.backgroundColor = newColor;
+            this._compassColorHex = this._colorToHexStr(newColor);
 
-      const diagBtn = makeElement('button', {
-        className: 'accudraw-diag-btn',
-        style: {
-          display: 'block',
-          width: '100%',
-          padding: '8px',
-          marginTop: '12px',
-          background: '#0a0d0a',
-          border: '1px dashed #00ff66',
-          color: '#00ff66',
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          fontWeight: 'bold',
-          textTransform: 'uppercase',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          boxShadow: '0 2px 6px rgba(0,255,102,0.15)',
-          transition: 'all 0.15s ease'
-        },
-        onclick: () => {
-          if (!this.baseController.accuDrawDiagnostics) {
-            this.baseController.accuDrawDiagnostics = new AccuDrawDiagnostics(
-              this.baseController
-            );
+            const rgbNum = this._colorToRgbNum(newColor);
+            if (this.baseController.accuDraw?.update) {
+              this.baseController.accuDraw.update({ color: rgbNum });
+            }
+            this._saveSetting('hexColor', this._compassColorHex);
+          });
+        };
+
+        compassColorContainer.appendChild(compassColorLabel);
+        compassColorContainer.appendChild(compassSwatch);
+        this.compassBox.contentElement.appendChild(compassColorContainer);
+
+        this.sliders.opa = new SliderControl({
+          label: 'transparency',
+          min: 0,
+          max: 1,
+          initialValue: savedSettings.opa !== undefined ? savedSettings.opa : 1,
+          showValue: true,
+          callback: (val) => {
+            const rounded = Number(val.toFixed(2));
+            this._applyCompassSetting('transparency', rounded);
+            this._saveSetting('opa', rounded);
+          },
+        });
+        this.compassBox.contentElement.appendChild(this.sliders.opa.container);
+
+        this.sliders.sqrcl = new SliderControl({
+          label: 'square or circle',
+          min: 0,
+          max: 1,
+          initialValue: savedSettings.sqrcl !== undefined ? savedSettings.sqrcl : 0.5,
+          showValue: true,
+          callback: (val) => {
+            const rounded = Number(val.toFixed(2));
+            this._applyCompassSetting('square or circle', rounded);
+            this._saveSetting('sqrcl', rounded);
+          },
+        });
+        this.compassBox.contentElement.appendChild(this.sliders.sqrcl.container);
+
+        ['x', 'y', 'z'].forEach((axis) => {
+          this.sliders[`${axis}rot`] = new SliderControl({
+            label: `${axis} rotation`,
+            min: -90,
+            max: 90,
+            initialValue: 0,
+            saveToLocalStorage: false,
+            relativeMidi: true,
+            showValue: true,
+            directEntry: true,
+            callback: (val) =>
+              this._applyCompassSetting(`${axis} rotation`, Math.round(val)),
+          });
+          this.compassBox.contentElement.appendChild(
+            this.sliders[`${axis}rot`].container
+          );
+        });
+
+        this.sliders.bg = new SliderControl({
+          label: 'background',
+          min: 0,
+          max: 255,
+          initialValue: savedSettings.bg !== undefined ? savedSettings.bg : 34,
+          showValue: true,
+          callback: (val) => {
+            const rounded = Math.round(val);
+            this._applyCompassSetting('background', rounded);
+            this._saveSetting('bg', rounded);
+          },
+        });
+        this.compassBox.contentElement.appendChild(this.sliders.bg.container);
+
+        this.sliders.accudrawZ = new SliderControl({
+          label: 'accudraw Z position',
+          isInfiniteWheel: true,
+          saveToLocalStorage: false,
+          callback: (val) => {
+            const currentOrigin = this.baseController.origin;
+            const delta = typeof window.zMoveDelta !== 'undefined' ? window.zMoveDelta : 0.002;
+            const rm = this.baseController.rotationMatrix;
+            const zAxis = rm[2];
+            const displacement = zAxis.map((component) => component * val * delta * 1.5);
+            const newOrigin = [
+              currentOrigin[0] + displacement[0],
+              currentOrigin[1] + displacement[1],
+              currentOrigin[2] + displacement[2],
+            ];
+            this.baseController.setOrigin(newOrigin);
           }
-          this.baseController.accuDrawDiagnostics.toggle();
-        }
-      }, 'AccuDraw Diagnostics ▶');
+        });
+        this.compassBox.contentElement.appendChild(this.sliders.accudrawZ.container);
 
-      diagBtn.onmouseover = () => {
-        diagBtn.style.background = '#0e240e';
-        diagBtn.style.boxShadow = '0 2px 10px rgba(0,255,102,0.3)';
-      };
-      diagBtn.onmouseout = () => {
-        diagBtn.style.background = '#0a0d0a';
-        diagBtn.style.boxShadow = '0 2px 6px rgba(0,255,102,0.15)';
-      };
+        this._isProgrammaticReset = false;
 
-      this.compassBox.contentElement.appendChild(diagBtn);
+        this._applyAllSavedSettings(savedSettings);
 
-      const spinnerBtn = makeElement('button', {
-        className: 'accudraw-diag-btn',
-        style: {
-          display: 'block',
-          width: '100%',
-          padding: '8px',
-          marginTop: '8px',
-          background: '#0a0a0d',
-          border: '1px dashed #4af',
-          color: '#4af',
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          fontWeight: 'bold',
-          textTransform: 'uppercase',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          boxShadow: '0 2px 6px rgba(68,170,255,0.15)',
-          transition: 'all 0.15s ease'
-        },
-        onclick: () => {
-          if (!this.spinnerBox) {
-            this._createSpinnerControls();
-          } else {
-            const show = this.spinnerBox.element.style.display === 'none';
-            this.spinnerBox.element.style.display = show ? 'flex' : 'none';
-            this.spinnerBox.element.style.opacity = show ? '1' : '0';
-            this.spinnerBox.element.style.transform = show ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(20px)';
+        const diagBtn = makeElement('button', {
+          className: 'accudraw-diag-btn',
+          style: {
+            display: 'block',
+            width: '100%',
+            padding: '8px',
+            marginTop: '12px',
+            background: '#0a0d0a',
+            border: '1px dashed #00ff66',
+            color: '#00ff66',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(0,255,102,0.15)',
+            transition: 'all 0.15s ease'
+          },
+          onclick: () => {
+            if (!this.baseController.accuDrawDiagnostics) {
+              this.baseController.accuDrawDiagnostics = new AccuDrawDiagnostics(
+                this.baseController
+              );
+            }
+            this.baseController.accuDrawDiagnostics.toggle();
           }
-        }
-      }, 'Toggle View Spinners ▞');
+        }, 'AccuDraw Diagnostics ▶');
 
-      spinnerBtn.onmouseover = () => {
-        spinnerBtn.style.background = '#0e1a24';
-        spinnerBtn.style.boxShadow = '0 2px 10px rgba(68,170,255,0.3)';
-      };
-      spinnerBtn.onmouseout = () => {
-        spinnerBtn.style.background = '#0a0a0d';
-        spinnerBtn.style.boxShadow = '0 2px 6px rgba(68,170,255,0.15)';
-      };
+        diagBtn.onmouseover = () => {
+          diagBtn.style.background = '#0e240e';
+          diagBtn.style.boxShadow = '0 2px 10px rgba(0,255,102,0.3)';
+        };
+        diagBtn.onmouseout = () => {
+          diagBtn.style.background = '#0a0d0a';
+          diagBtn.style.boxShadow = '0 2px 6px rgba(0,255,102,0.15)';
+        };
 
-      this.compassBox.contentElement.appendChild(spinnerBtn);
-    }
+        this.compassBox.contentElement.appendChild(diagBtn);
 
+        const spinnerBtn = makeElement('button', {
+          className: 'accudraw-diag-btn',
+          style: {
+            display: 'block',
+            width: '100%',
+            padding: '8px',
+            marginTop: '8px',
+            background: '#0a0a0d',
+            border: '1px dashed #4af',
+            color: '#4af',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(68,170,255,0.15)',
+            transition: 'all 0.15s ease'
+          },
+          onclick: () => {
+            if (!this.spinnerBox) {
+              this._createSpinnerControls();
+            } else {
+              const show = this.spinnerBox.element.style.display === 'none';
+              this.spinnerBox.element.style.display = show ? 'flex' : 'none';
+              this.spinnerBox.element.style.opacity = show ? '1' : '0';
+              this.spinnerBox.element.style.transform = show ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(20px)';
+            }
+          }
+        }, 'Toggle View Spinners ▞');
+
+        spinnerBtn.onmouseover = () => {
+          spinnerBtn.style.background = '#0e1a24';
+          spinnerBtn.style.boxShadow = '0 2px 10px rgba(68,170,255,0.3)';
+        };
+        spinnerBtn.onmouseout = () => {
+          spinnerBtn.style.background = '#0a0a0d';
+          spinnerBtn.style.boxShadow = '0 2px 6px rgba(68,170,255,0.15)';
+        };
+
+        this.compassBox.contentElement.appendChild(spinnerBtn);
+
+        const docsBtn = makeElement('button', {
+          className: 'accudraw-diag-btn',
+          style: {
+            display: 'block',
+            width: '100%',
+            padding: '8px',
+            marginTop: '8px',
+            background: '#120d1f',
+            border: '1px solid #a855f7',
+            color: '#c084fc',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(168,85,247,0.15)',
+            transition: 'all 0.15s ease'
+          },
+          onclick: () => {
+            window.open('docs.html', '_blank');
+          }
+        }, 'Engine Documentation 📖');
+
+        docsBtn.onmouseover = () => {
+          docsBtn.style.background = '#21133b';
+          docsBtn.style.boxShadow = '0 2px 10px rgba(168,85,247,0.35)';
+        };
+        docsBtn.onmouseout = () => {
+          docsBtn.style.background = '#120d1f';
+          docsBtn.style.boxShadow = '0 2px 6px rgba(168,85,247,0.15)';
+        };
+
+        this.compassBox.contentElement.appendChild(docsBtn);
+      }
   _createSpinnerControls() {
       const hostContainer = this.baseController?.domElement?.parentElement || document.body;
 
@@ -420,50 +454,53 @@ class ViewControls {
   }
 
   _applyCompassSetting(name, value) {
-      if (this._isProgrammaticReset) return;
+    if (this._isProgrammaticReset) return;
 
-      const controller = this.baseController;
-      const view = this.threeDView;
-      if (!controller || !view) return;
+    const controller = this.baseController;
+    const view = this.threeDView;
+    if (!controller || !view) return;
 
-      const target = controller.accuDraw;
+    const target = controller.accuDraw;
 
-      if (name === 'size') {
-        const adjustedSize = value * (1.5 / 300);
-        if (target?.setSizeAnimated) {
-          target.setSizeAnimated(adjustedSize, 0);
-        }
-      } else if (name === 'square or circle') {
-        if (target?.setSquircleAnimated) {
-          target.setSquircleAnimated(value, 0);
-        }
-      } else if (name === 'background') {
-        const percent = value / 255;
-        view.scene.background = new THREE.Color(percent, percent, percent);
-      } else if (name === 'transparency') {
-        if (target?.update) {
-          target.update({ opacity: 1 - value });
-        }
-      } else if (name === 'depth aware') {
-        if (target?.update) {
-          target.update({ depthTest: value });
-        }
-      } else if (name.endsWith('rotation')) {
-        const axis = name.split(' ')[0];
-        this.rotations[axis] = value;
-        const updatedMatrix = this._buildRotationMatrix(
-          this.rotations.x,
-          this.rotations.y,
-          this.rotations.z
-        );
-        if (target?.setRotationAnimated) {
-          controller.rotationMatrix = updatedMatrix;
-          target.setRotationAnimated(updatedMatrix, 0);
-          controller.refreshMousePosition();
-        }
+    if (name === 'size') {
+      const adjustedSize = value * (1.5 / 300);
+      if (target?.setSizeAnimated) {
+        target.setSizeAnimated(adjustedSize, 0);
+      }
+    } else if (name === 'square or circle') {
+      if (target?.setSquircleAnimated) {
+        target.setSquircleAnimated(value, 0);
+      }
+    } else if (name === 'background') {
+      const percent = value / 255;
+      view.scene.background = new THREE.Color(percent, percent, percent);
+      // Dynamic contrast adaptation parity with Bentley iTwin adjustedForContrast
+      if (target?.updateContrast) {
+        target.updateContrast();
+      }
+    } else if (name === 'transparency') {
+      if (target?.update) {
+        target.update({ opacity: 1 - value });
+      }
+    } else if (name === 'depth aware') {
+      if (target?.update) {
+        target.update({ depthTest: value });
+      }
+    } else if (name.endsWith('rotation')) {
+      const axis = name.split(' ')[0];
+      this.rotations[axis] = value;
+      const updatedMatrix = this._buildRotationMatrix(
+        this.rotations.x,
+        this.rotations.y,
+        this.rotations.z
+      );
+      if (target?.setRotationAnimated) {
+        controller.rotationMatrix = updatedMatrix;
+        target.setRotationAnimated(updatedMatrix, 0);
+        controller.refreshMousePosition();
       }
     }
-
+  }
   _transformView(inc, name) {
     if (name === 'accudrawZ') {
       const currentOrigin = this.baseController.origin;
@@ -861,111 +898,110 @@ class ViewControls {
       };
     }
 
-  
-
   getNavigatableSliders() {
-      const list = [];
-      
-      if (this.sliders.size) {
-        list.push({ key: 'size', slider: this.sliders.size, type: 'compass' });
-      }
-      
-      if (this.compassSwatch) {
-        list.push({
-          key: 'compassColor',
-          slider: {
-            container: this.compassSwatch.parentElement || this.compassSwatch,
-            value: this._hexToHsv(this._compassColorHex || '#88ccff').h,
-            setValue: (val) => {
-              const hsv = this._hexToHsv(this._compassColorHex || '#88ccff');
-              const newHex = this._hsvToHex(val % 360, hsv.s, hsv.v);
-              this._compassColorHex = newHex;
-              if (this.compassSwatch) {
-                this.compassSwatch.style.backgroundColor = newHex;
-              }
-              if (this.baseController.accuDraw?.update) {
-                this.baseController.accuDraw.update({ color: this._colorToRgbNum(newHex) });
-              }
-              this._saveSetting('hexColor', newHex);
+    const list = [];
+
+    if (this.sliders.size) {
+      list.push({ key: 'size', slider: this.sliders.size, type: 'compass' });
+    }
+
+    if (this.compassSwatch) {
+      list.push({
+        key: 'compassColor',
+        slider: {
+          container: this.compassSwatch.parentElement || this.compassSwatch,
+          value: this._hexToHsv(this._compassColorHex || '#88ccff').h,
+          setValue: (val) => {
+            const hsv = this._hexToHsv(this._compassColorHex || '#88ccff');
+            const newHex = this._hsvToHex(val % 360, hsv.s, hsv.v);
+            this._compassColorHex = newHex;
+            if (this.compassSwatch) {
+              this.compassSwatch.style.backgroundColor = newHex;
             }
-          },
+            if (this.baseController.accuDraw?.update) {
+              this.baseController.accuDraw.update({ color: this._colorToRgbNum(newHex) });
+            }
+            this._saveSetting('hexColor', newHex);
+          }
+        },
+        type: 'compass'
+      });
+    }
+
+    const remainingKeys = ['opa', 'sqrcl', 'xrot', 'yrot', 'zrot', 'bg', 'accudrawZ'];
+    remainingKeys.forEach(key => {
+      if (this.sliders[key]) {
+        list.push({
+          key: key,
+          slider: this.sliders[key],
           type: 'compass'
         });
       }
+    });
 
-      const remainingKeys = ['opa', 'sqrcl', 'xrot', 'yrot', 'zrot', 'bg', 'accudrawZ'];
-      remainingKeys.forEach(key => {
-        if (this.sliders[key]) {
+    const swatchPicker = this.baseController?.colorSwatchPicker;
+    if (swatchPicker) {
+      const hsv = this._hexToHsv(this.baseController.currentColor || '#00ff00');
+      list.push({
+        key: 'drawingColor',
+        slider: {
+          container: swatchPicker.parentElement || swatchPicker,
+          value: hsv.h,
+          setValue: (val) => {
+            const hsvCurrent = this._hexToHsv(this.baseController.currentColor || '#00ff00');
+            const newHex = this._hsvToHex(val % 360, hsvCurrent.s, hsvCurrent.v);
+            this.baseController.setColor(newHex);
+            if (this.baseController.colorSwatchPicker) {
+              this.baseController.colorSwatchPicker.style.backgroundColor = newHex;
+            }
+            this.baseController.refreshMousePosition();
+          }
+        },
+        type: 'tool'
+      });
+    }
+
+    const sidePanel = this.baseController?.sidePanel;
+    const toolSliders = this.baseController?.toolSliders || sidePanel?.toolSliders;
+    if (toolSliders) {
+      Object.entries(toolSliders).forEach(([key, slider]) => {
+        if (slider) {
           list.push({
             key: key,
-            slider: this.sliders[key],
-            type: 'compass'
+            slider: slider,
+            type: 'tool'
           });
         }
       });
-
-      const swatchPicker = this.baseController?.colorSwatchPicker;
-      if (swatchPicker) {
-        const hsv = this._hexToHsv(this.baseController.currentColor || '#00ff00');
-        list.push({
-          key: 'drawingColor',
-          slider: {
-            container: swatchPicker.parentElement || swatchPicker,
-            value: hsv.h,
-            setValue: (val) => {
-              const hsvCurrent = this._hexToHsv(this.baseController.currentColor || '#00ff00');
-              const newHex = this._hsvToHex(val % 360, hsvCurrent.s, hsvCurrent.v);
-              this.baseController.setColor(newHex);
-              if (this.baseController.colorSwatchPicker) {
-                this.baseController.colorSwatchPicker.style.backgroundColor = newHex;
-              }
-              this.baseController.refreshMousePosition();
-            }
-          },
-          type: 'tool'
-        });
-      }
-
-      const sidePanel = this.baseController?.sidePanel;
-      const toolSliders = this.baseController?.toolSliders || sidePanel?.toolSliders;
-      if (toolSliders) {
-        Object.entries(toolSliders).forEach(([key, slider]) => {
-          if (slider) {
-            list.push({
-              key: key,
-              slider: slider,
-              type: 'tool'
-            });
-          }
-        });
-      }
-
-      // Add custom command settings/checkboxes as navigatable tool settings
-      const activeCmd = this.baseController?.activeCommand;
-      if (activeCmd && typeof activeCmd.getCommandSettings === 'function') {
-        const customSettings = activeCmd.getCommandSettings();
-        const rows = document.querySelectorAll('.tool-setting-checkbox-row');
-        customSettings.forEach((setting, idx) => {
-          const row = rows[idx];
-          if (row) {
-            list.push({
-              key: setting.id,
-              type: 'tool',
-              isCheckbox: true,
-              setting: setting,
-              slider: {
-                container: row,
-                value: setting.value ? 1 : 0,
-                setValue: (val) => {}
-              }
-            });
-          }
-        });
-      }
-
-      return list;
     }
 
+    // Add custom command checkboxes with exact 1:1 DOM row filtering
+    const activeCmd = this.baseController?.activeCommand;
+    if (activeCmd && typeof activeCmd.getCommandSettings === 'function') {
+      const customSettings = activeCmd.getCommandSettings();
+      const checkboxSettings = customSettings.filter(s => s.type === 'checkbox');
+      const rows = document.querySelectorAll('.tool-setting-checkbox-row');
+
+      checkboxSettings.forEach((setting, idx) => {
+        const row = rows[idx];
+        if (row) {
+          list.push({
+            key: setting.id,
+            type: 'tool',
+            isCheckbox: true,
+            setting: setting,
+            slider: {
+              container: row,
+              value: setting.value ? 1 : 0,
+              setValue: (val) => {}
+            }
+          });
+        }
+      });
+    }
+
+    return list;
+  }
   selectSliderAbsolute(index) {
       const list = this.getNavigatableSliders();
       if (list.length === 0) return;

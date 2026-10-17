@@ -325,186 +325,165 @@ class Main {
     }
 
   _setupToolSettingsWatcher() {
+    this.toolSliders = {};
+    const render = () => {
+      if (!this.sidePanel || !this.sidePanel.toolSettingsSection) return;
+      this.sidePanel.toolSettingsSection.innerHTML = '';
       this.toolSliders = {};
-      const render = () => {
-        if (!this.sidePanel || !this.sidePanel.toolSettingsSection) return;
-        this.sidePanel.toolSettingsSection.innerHTML = '';
-        this.toolSliders = {};
 
-        const controller = this.baseController;
-        if (!controller) return;
+      const controller = this.baseController;
+      if (!controller) return;
 
-        const activeCmd = controller.activeCommand;
-        const cmdName = activeCmd
-          ? activeCmd.constructor
-            ? activeCmd.constructor.name
-            : 'Unknown'
-          : 'None';
+      const activeCmd = controller.activeCommand;
+      const cmdName = activeCmd
+        ? activeCmd.constructor
+          ? activeCmd.constructor.name
+          : 'Unknown'
+        : 'None';
 
-        const friendlyNames = {
-          DrawRectangleCommand: 'Rectangle Tool',
-          DrawArcCommand: 'Arc Tool',
-          DrawPathCommand: 'Rounding Tool',
-          DrawCurveCommand: 'Bezier Curve Tool',
-          DrawCircleCommand: 'Circle Tool',
-          DrawCapsuleCommand: 'Capsule Tool',
-          DeleteElementCommand: 'Delete Tool',
-          MoveElementCommand: 'Move Element Tool',
-          RotateElementCommand: 'Rotate Element Tool',
-          ScaleElementCommand: 'Scale Element Tool'
-        };
-        const displayName =
-          friendlyNames[cmdName] || cmdName.replace('Command', ' Tool');
-
-        if (
-          this.sidePanel.sectionObjects &&
-          this.sidePanel.sectionObjects['setup']
-        ) {
-          this.sidePanel.sectionObjects['setup'].header.textContent = displayName;
-        }
-
-        const showGlobalSettings = !activeCmd || !activeCmd.excludeGlobalSettings;
-
-        if (showGlobalSettings) {
-          const colorContainer = document.createElement('div');
-          colorContainer.style.cssText =
-            'display: flex; align-items: center; justify-content: space-between; padding: 4px 0; margin-bottom: 8px;';
-
-          const colorLabel = document.createElement('div');
-          colorLabel.style.cssText =
-            'font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold;';
-          colorLabel.textContent = 'Drawing Color';
-
-          const swatch = document.createElement('div');
-          swatch.className = 'drawing-color-swatch-picker';
-          swatch.style.cssText = `width: 42px; height: 20px; border-radius: 4px; background-color: ${
-            controller.currentColor || '#00ff00'
-          }; border: 1px solid #555; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.5);`;
-
-          controller.colorSwatchPicker = swatch;
-
-          swatch.onclick = (e) => {
-            e.stopPropagation();
-            const picker = new ColorPicker();
-            picker.openSmartPicker(
-              swatch,
-              controller.currentColor || '#00ff00',
-              (newColor) => {
-                swatch.style.backgroundColor = newColor;
-                controller.setColor(newColor);
-                controller.refreshMousePosition();
-              }
-            );
-          };
-
-          colorContainer.appendChild(colorLabel);
-          colorContainer.appendChild(swatch);
-          this.sidePanel.toolSettingsSection.appendChild(colorContainer);
-
-          const widthSlider = new SliderControl({
-            label: 'line thickness',
-            min: 1,
-            max: 20,
-            initialValue: controller.lineWidth || 2,
-            showValue: true,
-            callback: (val) => {
-              controller.setLineWidth(Math.round(val));
-              controller.refreshMousePosition();
-            },
-          });
-          this.sidePanel.toolSettingsSection.appendChild(widthSlider.container);
-          this.toolSliders['lineWidth'] = widthSlider;
-        }
-
-        const supportsControlValue = [
-          'DrawPathCommand',
-          'DrawCapsuleCommand',
-        ].includes(cmdName);
-
-        if (supportsControlValue) {
-          let label = 'tool custom parameter';
-          let minVal = 0.05,
-            maxVal = 2.0;
-          if (cmdName === 'DrawPathCommand') {
-            label = 'rounding radius';
-            minVal = 0;
-            maxVal = 1.0;
-          } else if (cmdName === 'DrawCapsuleCommand') {
-            label = 'capsule radius';
-            minVal = 0.1;
-            maxVal = 1.5;
-          }
-
-          const controlValueSlider = new SliderControl({
-            label: label,
-            min: minVal,
-            max: maxVal,
-            initialValue: controller.commandControlValue || 0.25,
-            showValue: true,
-            directEntry: true,
-            callback: (val) => {
-              controller.commandControlValue = val;
-              controller.refreshMousePosition();
-            },
-          });
-          this.sidePanel.toolSettingsSection.appendChild(
-            controlValueSlider.container
-          );
-          this.toolSliders['commandControlValue'] = controlValueSlider;
-        }
-
-        // Render any dynamic command custom settings (e.g. checkboxes)
-        if (activeCmd && typeof activeCmd.getCommandSettings === 'function') {
-          const customSettings = activeCmd.getCommandSettings();
-          customSettings.forEach((setting) => {
-            if (setting.type === 'checkbox') {
-              const row = document.createElement('div');
-              row.className = 'tool-setting-checkbox-row';
-              row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 0; margin-bottom: 4px;';
-              
-              const label = document.createElement('div');
-              label.style.cssText = 'font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold;';
-              label.textContent = setting.label;
-
-              const input = document.createElement('input');
-              input.type = 'checkbox';
-              input.checked = !!setting.value;
-              input.setAttribute('tabindex', '-1');
-              input.style.cssText = 'cursor: pointer; width: 16px; height: 16px; accent-color: #00e676;';
-              input.onchange = (e) => {
-                setting.callback(e.target.checked);
-              };
-
-              input.addEventListener('focus', () => {
-                input.blur();
-                controller.domElement.focus();
-              });
-
-              row.appendChild(label);
-              row.appendChild(input);
-              this.sidePanel.toolSettingsSection.appendChild(row);
-            }
-          });
-        }
-
-        controller.toolSliders = this.toolSliders;
-
-        if (
-          window.ViewControlsManager &&
-          window.ViewControlsManager.instance &&
-          typeof window.ViewControlsManager.instance
-            ._updateSlidersHighlighting === 'function'
-        ) {
-          window.ViewControlsManager.instance._updateSlidersHighlighting();
-        }
+      const friendlyNames = {
+        DrawRectangleCommand: 'Rectangle Tool',
+        DrawArcCommand: 'Arc Tool',
+        DrawPathCommand: 'Rounding Tool',
+        DrawCurveCommand: 'On-Curve Spline Tool',
+        DrawCircleCommand: 'Circle Tool',
+        DrawCapsuleCommand: 'Capsule Tool',
+        DeleteElementCommand: 'Delete Tool',
+        MoveElementCommand: 'Move Element Tool',
+        RotateElementCommand: 'Rotate Element Tool',
+        ScaleElementCommand: 'Scale Element Tool'
       };
+      const displayName =
+        friendlyNames[cmdName] || cmdName.replace('Command', ' Tool');
 
-      window.addEventListener('accucad-tool-changed', () => {
-        render();
-      });
+      if (
+        this.sidePanel.sectionObjects &&
+        this.sidePanel.sectionObjects['setup']
+      ) {
+        this.sidePanel.sectionObjects['setup'].header.textContent = displayName;
+      }
 
+      const showGlobalSettings = !activeCmd || !activeCmd.excludeGlobalSettings;
+
+      if (showGlobalSettings) {
+        const colorContainer = document.createElement('div');
+        colorContainer.style.cssText =
+          'display: flex; align-items: center; justify-content: space-between; padding: 4px 0; margin-bottom: 8px;';
+
+        const colorLabel = document.createElement('div');
+        colorLabel.style.cssText =
+          'font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold;';
+        colorLabel.textContent = 'Drawing Color';
+
+        const swatch = document.createElement('div');
+        swatch.className = 'drawing-color-swatch-picker';
+        swatch.style.cssText = `width: 42px; height: 20px; border-radius: 4px; background-color: ${
+          controller.currentColor || '#00ff00'
+        }; border: 1px solid #555; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.5);`;
+
+        controller.colorSwatchPicker = swatch;
+
+        swatch.onclick = (e) => {
+          e.stopPropagation();
+          const picker = new ColorPicker();
+          picker.openSmartPicker(
+            swatch,
+            controller.currentColor || '#00ff00',
+            (newColor) => {
+              swatch.style.backgroundColor = newColor;
+              controller.setColor(newColor);
+              controller.refreshMousePosition();
+            }
+          );
+        };
+
+        colorContainer.appendChild(colorLabel);
+        colorContainer.appendChild(swatch);
+        this.sidePanel.toolSettingsSection.appendChild(colorContainer);
+
+        const widthSlider = new SliderControl({
+          label: 'line thickness',
+          min: 1,
+          max: 20,
+          initialValue: controller.lineWidth || 2,
+          showValue: true,
+          callback: (val) => {
+            controller.setLineWidth(Math.round(val));
+            controller.refreshMousePosition();
+          },
+        });
+        this.sidePanel.toolSettingsSection.appendChild(widthSlider.container);
+        this.toolSliders['lineWidth'] = widthSlider;
+      }
+
+      // Dynamic command settings (sliders and checkboxes declared by the active command)
+      const hasCustomSettings = activeCmd && typeof activeCmd.getCommandSettings === 'function';
+
+      if (hasCustomSettings) {
+        const customSettings = activeCmd.getCommandSettings();
+        customSettings.forEach((setting) => {
+          if (setting.type === 'checkbox') {
+            const row = document.createElement('div');
+            row.className = 'tool-setting-checkbox-row';
+            row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 0; margin-bottom: 4px;';
+
+            const label = document.createElement('div');
+            label.style.cssText = 'font-size: 11px; color: #aaa; text-transform: uppercase; font-weight: bold;';
+            label.textContent = setting.label;
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = !!setting.value;
+            input.setAttribute('tabindex', '-1');
+            input.style.cssText = 'cursor: pointer; width: 16px; height: 16px; accent-color: #00e676;';
+            input.onchange = (e) => {
+              setting.callback(e.target.checked);
+            };
+
+            input.addEventListener('focus', () => {
+              input.blur();
+              controller.domElement.focus();
+            });
+
+            row.appendChild(label);
+            row.appendChild(input);
+            this.sidePanel.toolSettingsSection.appendChild(row);
+          } else if (setting.type === 'slider') {
+            const slider = new SliderControl({
+              label: setting.label,
+              min: setting.min !== undefined ? setting.min : 0.1,
+              max: setting.max !== undefined ? setting.max : 2.0,
+              step: setting.step !== undefined ? setting.step : 0.05,
+              initialValue: setting.value !== undefined ? setting.value : 0.5,
+              showValue: true,
+              directEntry: true,
+              callback: (val) => {
+                setting.callback(val);
+              }
+            });
+            this.sidePanel.toolSettingsSection.appendChild(slider.container);
+            this.toolSliders[setting.id] = slider;
+          }
+        });
+      }
+
+      controller.toolSliders = this.toolSliders;
+
+      if (
+        window.ViewControlsManager &&
+        window.ViewControlsManager.instance &&
+        typeof window.ViewControlsManager.instance._updateSlidersHighlighting === 'function'
+      ) {
+        window.ViewControlsManager.instance._updateSlidersHighlighting();
+      }
+    };
+
+    window.addEventListener('accucad-tool-changed', () => {
       render();
-    }
+    });
+
+    render();
+  }
 }
 if (typeof window !== 'undefined') window.Main = Main;
 globalThis.Main = Main;

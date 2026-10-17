@@ -84,12 +84,12 @@ class AccuDraw {
 
     const S = this.options.size;
     const scale = S / 0.5;
-    // Define tick dimensions for logic use later
+
     this.tickDims = {
       start: 0.4 * scale,
       end: 0.6 * scale,
       radius: S / 60,
-      sphereRadius: S / 60, // Same as cylinder radius
+      sphereRadius: S / 60,
       length: (0.6 - 0.4) * scale,
     };
 
@@ -98,9 +98,9 @@ class AccuDraw {
     const gray = 0x808080;
     const dt = this.options.depthTest;
     const r = this.tickDims.radius;
+    const contrastCol = this.getContrastColor ? this.getContrastColor() : 0xffffff;
 
     const createTick = (axis, sign, color) => {
-      // Create geometry centered at origin
       const h = this.tickDims.length;
       const cylinderGeometry = new THREE.CylinderGeometry(r, r, h, 16, 1);
       if (axis === 'x') cylinderGeometry.rotateZ((sign * Math.PI) / 2);
@@ -120,8 +120,6 @@ class AccuDraw {
       grp.add(s1);
       grp.add(s2);
 
-      // Position spheres relative to group center
-      // Center of tick is at distance (start+end)/2
       if (axis === 'x') {
         s1.position.x = (-sign * h) / 2;
         s2.position.x = (sign * h) / 2;
@@ -130,7 +128,6 @@ class AccuDraw {
         s2.position.y = (sign * h) / 2;
       }
 
-      // Position Group at resting place
       const baseDist = (this.tickDims.start + this.tickDims.end) / 2;
       if (axis === 'x') grp.position.x = sign * baseDist;
       else grp.position.y = sign * baseDist;
@@ -149,11 +146,11 @@ class AccuDraw {
 
     this.decorationsGroup.add(tx, tnx, ty, tny);
 
-    // Center Dot
+    // Center Dot (dynamically contrasts against background)
     const centerRadius = (2 / 3) * 0.05 * scale;
     const centerSphere = new THREE.Mesh(
       new THREE.SphereGeometry(centerRadius, 32, 32),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: dt })
+      new THREE.MeshBasicMaterial({ color: contrastCol, depthTest: dt })
     );
     this.decorationsGroup.add(centerSphere);
 
@@ -164,10 +161,8 @@ class AccuDraw {
 
     this.group.add(this.decorationsGroup);
 
-    // Restart animation if needed
     if (this.activeAnimationAxis) this._startAxisAnimation();
   }
-
   updateIndexIndicator(
     origin,
     constrainedPoint,
@@ -562,36 +557,37 @@ class AccuDraw {
     }
 
     const { world, local, axis, isPulledAway } = this.currentIndexTarget;
+    const contrastCol = this.getContrastColor ? this.getContrastColor() : 0xffffff;
 
-    // --- Mini-Jack Visibility ---
+    // Mini-Jack Visibility & Contrast
     this.projectedMarker.visible = isPulledAway;
     if (isPulledAway) {
       this.projectedMarker.position.copy(world);
+      this.projectedMarker.traverse((child) => {
+        if (child.material && child.material.color) {
+          child.material.color.setHex(contrastCol);
+        }
+      });
     }
 
-    // --- Index Line Visibility ---
-    // If no axis, or if it is 'xy' (Origin Snap), we don't draw a line,
-    // we just rely on the pulsing ticks.
+    // If no axis, or if it is 'xy' (Origin Snap), hide line
     if (!axis || axis === 'xy') {
       this.indexIndicator.visible = false;
       return;
     }
 
-    // FIX: Removed the perpendicular distance check.
-    // If 'axis' is set (e.g. 'x'), we assume we are conceptually on that axis,
-    // even if a lock has forced the cursor position physically away from it.
     this.indexIndicator.visible = true;
+    if (this.indexIndicator.material && this.indexIndicator.material.color) {
+      this.indexIndicator.material.color.setHex(contrastCol);
+    }
 
     const val = axis === 'x' ? local.x : local.y;
     const sign = val >= 0 ? 1 : -1;
-
-    // Line floats at Z-height of the constrained point
     const zHeight = local.z;
 
     const startLocal = new THREE.Vector3(0, 0, zHeight);
     const endLocal = new THREE.Vector3(0, 0, zHeight);
 
-    // FIX: Force the line geometry to lie strictly ON the axis (0 for the other dimension).
     if (axis === 'x') {
       endLocal.x = local.x;
       endLocal.y = 0;
@@ -625,7 +621,6 @@ class AccuDraw {
           if (axis === 'x') startLocal.x = sign * startDist;
           else startLocal.y = sign * startDist;
         } else {
-          // Dead zone (on top of ticks): hide line
           if (cursorDist > innerBound) {
             this.indexIndicator.visible = false;
           }
@@ -659,7 +654,6 @@ class AccuDraw {
       this.indexIndicator.renderOrder = 99999;
     }
   }
-
   setAxisAnimation(axis) {
     if (this.activeAnimationAxis === axis) return;
 
@@ -692,6 +686,36 @@ class AccuDraw {
     });
   }
 
+  getContrastColor(delta = 155) {
+    // Parity with Bentley iTwin AccuDraw.ts adjustedForContrast(bgColor, delta):
+    // Dynamically computes high-contrast stroke color based on viewport background luminance.
+    let bgLuminance = 0.13;
+    if (this.threeDView && this.threeDView.scene && this.threeDView.scene.background) {
+      const bg = this.threeDView.scene.background;
+      if (bg && bg.isColor) {
+        bgLuminance = (bg.r * 299 + bg.g * 587 + bg.b * 114) / 1000;
+      }
+    }
+    return bgLuminance > 0.5 ? 0x111827 : 0xffffff;
+  }
+
+  updateContrast() {
+    const contrastCol = this.getContrastColor();
+
+    if (this.indexIndicator && this.indexIndicator.material) {
+      this.indexIndicator.material.color.setHex(contrastCol);
+    }
+
+    if (this.projectedMarker) {
+      this.projectedMarker.traverse((child) => {
+        if (child.material && child.material.color) {
+          child.material.color.setHex(contrastCol);
+        }
+      });
+    }
+
+    this._createDecorations();
+  }
 }
 if (typeof window !== 'undefined') window.AccuDraw = AccuDraw;
 globalThis.AccuDraw = AccuDraw;

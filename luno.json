@@ -1,6 +1,6 @@
 {
   "name": "accuCad",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Precision 2D/3D CAD Drawing & Geometric Constraint Snapping Engine (Three.js WebGL & AccuDraw)",
   "type": "luno-web-app",
   "entrypoint": {
@@ -34,11 +34,14 @@
     "js/TransformView.js",
     "js/ViewManipulator.js",
     "js/accudraw/AccuDrawLogic.js",
+    "js/accudraw/CompassDrawBridge.js",
     "js/commands/BaseDrawCommand.js",
     "js/commands/DeleteElementCommand.js",
     "js/commands/DrawArcCommand.js",
     "js/commands/DrawCapsuleCommand.js",
     "js/commands/DrawCircleCommand.js",
+    "js/BezierVertex.js",
+    "js/UpdateControlPoints.js",
     "js/commands/DrawCurveCommand.js",
     "js/commands/DrawPathCommand.js",
     "js/commands/DrawRectangleCommand.js",
@@ -77,18 +80,5 @@
     "UITools.js",
     "DomBasics.js"
   ],
-  "styles": [],
-  "processedCountSinceCheckpoint": 0,
-  "changedMethods": {
-    "library/ThreeJSLoader.js": "2026-09-07T04:11:19.397Z",
-    "js/Main.js": "2026-09-07T04:11:19.397Z",
-    "index.html": "2026-09-07T04:11:19.397Z",
-    "Library/P2PConnector.js": "2026-10-13T02:16:04.179Z",
-    "js/ui/AccuDrawUi.js": "2026-10-13T02:16:04.179Z",
-    "Luno/app/LunoDeployEngine.js": "2026-10-13T02:25:43.667Z",
-    "Luno/app/LunoSpaHeaderNav.js": "2026-10-13T03:01:00.621Z",
-    "Library/LunoLoader.js": "2026-10-13T03:12:25.801Z"
-  },
-  "lastCheckpointTime": "2026-10-13T03:20:41.139Z",
-  "pendingCheckpointDescription": "Clean working tree"
+  "styles": []
 }

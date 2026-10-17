@@ -216,12 +216,23 @@ class DrawPathCommand {
     finalPoints.push([...vertices[0].point]);
 
     for (let i = 1; i < vertices.length - 1; i++) {
-      const v1 = vertices[i - 1],
-        v2 = vertices[i],
-        v3 = vertices[i + 1];
+      const v1 = vertices[i - 1];
+      const v2 = vertices[i];
+      const v3 = vertices[i + 1];
+
       if (v2.radius > 1e-8) {
         const roundData = RoundingUtils3D.getRoundingData(v1, v2, v3);
         if (roundData) {
+          // Calculate and cache the CADCraft/AutoCAD bulge factor tan(theta/4) on the vertex
+          if (typeof RoundingUtils3D.arcToBulge === 'function') {
+            v2.bulge = RoundingUtils3D.arcToBulge(
+              roundData.tangentPoint1,
+              roundData.tangentPoint2,
+              roundData.circleCenter,
+              roundData.sweepFlag === 1
+            );
+          }
+
           finalPoints.push(
             ...RoundingUtils3D.createArcPoints(
               roundData.tangentPoint1,
@@ -233,9 +244,11 @@ class DrawPathCommand {
             )
           );
         } else {
+          v2.bulge = 0;
           finalPoints.push([...v2.point]);
         }
       } else {
+        v2.bulge = 0;
         finalPoints.push([...v2.point]);
       }
     }
@@ -244,7 +257,6 @@ class DrawPathCommand {
 
     return finalPoints;
   }
-
   reset() {
       // Clear and dispose of the dynamic preview shape immediately on reset/finalize
       if (this.previewShape) {
@@ -302,6 +314,49 @@ class DrawPathCommand {
         }
       });
     }
+
+  getCommandSettings() {
+    return [
+      {
+        id: 'roundingRadius',
+        label: 'Corner Fillet Radius',
+        type: 'slider',
+        min: 0,
+        max: 2.0,
+        step: 0.05,
+        value: this.base.commandControlValue !== undefined ? this.base.commandControlValue : 0,
+        callback: (val) => {
+          this.base.commandControlValue = val;
+          if (this.tempElement && this.tempElement.isTemporary) {
+            if (Array.isArray(this.tempElement.vertices)) {
+              this.tempElement.vertices.forEach(v => {
+                v.radius = val;
+              });
+            }
+            const lastPt = this.base.getLastWorldPoint() || 
+              (this.tempElement.vertices.length > 0 ? this.tempElement.vertices[this.tempElement.vertices.length - 1].point : null);
+            if (lastPt) {
+              this.updatePreviewShape(lastPt);
+            }
+          }
+          this.base.refreshMousePosition();
+        }
+      },
+      {
+        id: 'closed',
+        label: 'Auto-Close Shape',
+        type: 'checkbox',
+        value: this.tempElement ? !!this.tempElement.closed : false,
+        callback: (checked) => {
+          if (this.tempElement) {
+            this.tempElement.closed = checked;
+            this.updatePermanentGeometry();
+            this.base.refreshMousePosition();
+          }
+        }
+      }
+    ];
+  }
 }
 
 /* recursi-meta

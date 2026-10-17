@@ -544,25 +544,52 @@ class ElementOperations {
     }
 
   static buildVisualCurve(controller, el) {
-      const [cp0, cp1, cp2, cp3] = el.controlPoints.map(
-        (p) => new THREE.Vector3(...p)
-      );
-      const curve = new THREE.CubicBezierCurve3(cp0, cp1, cp2, cp3);
-      const curvePoints = curve.getPoints(50);
-      const positions = curvePoints.flatMap((p) => [p.x, p.y, p.z]);
+    const solver = (typeof UpdateControlPoints !== 'undefined') ? UpdateControlPoints : globalThis.UpdateControlPoints;
+    const vertexClass = (typeof BezierVertex !== 'undefined') ? BezierVertex : globalThis.BezierVertex;
 
-      const geometry = new LineGeometry();
-      geometry.setPositions(positions);
-      const material = new LineMaterial({
-        color: el.color ? (typeof el.color === 'string' ? parseInt(el.color.replace('#', ''), 16) : el.color) : 0xff0000,
-        linewidth: el.lineWidth || controller.lineWidth || 4,
-        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
-      });
-      const curveLine = new Line2(geometry, material);
-      el.threejsObject = curveLine;
-      controller.view.scene.add(curveLine);
+    // Reconstitute vertices if missing or raw points
+    if (!el.vertices || el.vertices.length === 0) {
+      if (el.points && el.points.length >= 2) {
+        el.vertices = el.points.map(p => new vertexClass([...p]));
+      } else if (el.controlPoints && el.controlPoints.length >= 2) {
+        el.vertices = el.controlPoints.map(p => new vertexClass([...p]));
+      }
     }
 
+    if (!el.vertices || el.vertices.length < 2) return;
+
+    // Run the 8-iteration relaxation solver to guarantee smooth G1 tangencies
+    solver.run(el.vertices, 8);
+
+    const points = [];
+    const segmentsPerSpan = 24;
+
+    for (let i = 0; i < el.vertices.length - 1; i++) {
+      const vStart = el.vertices[i];
+      const vEnd = el.vertices[i + 1];
+
+      const p0 = new THREE.Vector3(vStart.point[0], vStart.point[1], vStart.point[2]);
+      const p1 = new THREE.Vector3(vStart.controlPoints[1][0], vStart.controlPoints[1][1], vStart.controlPoints[1][2]);
+      const p2 = new THREE.Vector3(vEnd.controlPoints[0][0], vEnd.controlPoints[0][1], vEnd.controlPoints[0][2]);
+      const p3 = new THREE.Vector3(vEnd.point[0], vEnd.point[1], vEnd.point[2]);
+
+      const bezier = new THREE.CubicBezierCurve3(p0, p1, p2, p3);
+      const spanPts = bezier.getPoints(segmentsPerSpan);
+      spanPts.forEach(pt => points.push(pt));
+    }
+
+    const positions = points.flatMap((p) => [p.x, p.y, p.z]);
+    const geometry = new LineGeometry();
+    geometry.setPositions(positions);
+    const material = new LineMaterial({
+      color: el.color ? (typeof el.color === 'string' ? parseInt(el.color.replace('#', ''), 16) : el.color) : 0x00ff66,
+      linewidth: el.lineWidth || controller.lineWidth || 4,
+      resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+    });
+    const curveLine = new Line2(geometry, material);
+    el.threejsObject = curveLine;
+    controller.view.scene.add(curveLine);
+  }
   static buildVisualCircle(controller, el) {
       const cmd = new DrawCircleCommand(controller);
       const center = el.points[0];

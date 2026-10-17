@@ -151,4 +151,63 @@ class RoundingUtils3D {
 
     return points3D;
   }
+
+  static arcToBulge(startPt, endPt, center, clockwise = false) {
+    // Direct parity with CADCraft cadcraft_geom::arc_to_bulge:
+    // Returns bulge = tan(theta / 4) where theta is the included arc sweep angle.
+    const v1 = [startPt[0] - center[0], startPt[1] - center[1], (startPt[2] || 0) - (center[2] || 0)];
+    const v2 = [endPt[0] - center[0], endPt[1] - center[1], (endPt[2] || 0) - (center[2] || 0)];
+
+    const mag1 = Math.hypot(v1[0], v1[1], v1[2]);
+    const mag2 = Math.hypot(v2[0], v2[1], v2[2]);
+    if (mag1 < 1e-9 || mag2 < 1e-9) return 0;
+
+    const dot = (v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]) / (mag1 * mag2);
+    const clampedDot = Math.max(-1, Math.min(1, dot));
+    let theta = Math.acos(clampedDot);
+
+    if (clockwise) {
+      theta = -theta;
+    }
+
+    return Math.tan(theta / 4);
+  }
+
+  static bulgeToArc(p1, p2, bulge) {
+    // Direct parity with CADCraft cadcraft_geom::bulge_to_arc:
+    // Converts an AutoCAD/CADCraft (p1, p2, bulge) segment into center, radius, and angles.
+    if (Math.abs(bulge) < 1e-9) {
+      return null; // Straight line segment
+    }
+
+    const dx = p2[0] - p1[0];
+    const dy = p2[1] - p1[1];
+    const chord = Math.hypot(dx, dy);
+    if (chord < 1e-9) return null;
+
+    const theta = 4 * Math.atan(bulge);
+    const radius = chord / (2 * Math.sin(Math.abs(theta) / 2));
+    const sagitta = (chord / 2) * Math.abs(bulge);
+
+    const midX = (p1[0] + p2[0]) / 2;
+    const midY = (p1[1] + p2[1]) / 2;
+
+    // Normal vector perpendicular to chord
+    const perpX = -dy / chord;
+    const perpY = dx / chord;
+
+    const distToCenter = radius - sagitta;
+    const sign = bulge > 0 ? 1 : -1;
+
+    const centerX = midX - sign * distToCenter * perpX;
+    const centerY = midY - sign * distToCenter * perpY;
+    const centerZ = ((p1[2] || 0) + (p2[2] || 0)) / 2;
+
+    return {
+      center: [centerX, centerY, centerZ],
+      radius: radius,
+      sweepAngle: theta,
+      clockwise: bulge < 0
+    };
+  }
 }

@@ -1,12 +1,15 @@
-
 class DrawCurveCommand {
-  
   constructor(baseController) {
     this.initBase(baseController);
-    this.controlPoints = [];
+    this.vertices = [];
+    this.vertexDots = [];
+    this.curveLine = null;
     this.previewLine = null;
-    this.curvePreview = null;
-    this.controlSpheres = [];
+    this.allowSelfSnap = true;
+
+    // Default parameters matching DrawingApp
+    this.currentCurvature = 1.0;
+    this.currentBalance = 1.0;
   }
 
   onMouseDown(data) {
@@ -18,145 +21,207 @@ class DrawCurveCommand {
       this.base.setOrigin(point);
     }
 
-    this.controlPoints.push(point.slice());
+    const vertexClass = (typeof BezierVertex !== 'undefined') ? BezierVertex : globalThis.BezierVertex;
+    const v = new vertexClass(point.slice(), 'click');
+    v.curvature = this.currentCurvature;
+    v.balance = this.currentBalance;
+    this.vertices.push(v);
 
-    const sphereGeometry = new THREE.SphereGeometry(0.025, 16, 16);
-    const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
+    // Anchor sphere at on-curve through-point
+    const sphereGeometry = new THREE.SphereGeometry(0.04, 16, 16);
+    const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff66 });
     const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    sphere.position.set(...point);
+    sphere.position.set(point[0], point[1], point[2]);
     this.base.view.scene.add(sphere);
-    this.controlSpheres.push(sphere);
+    this.vertexDots.push(sphere);
 
-    this.updatePreview();
+    this.updatePermanentCurve();
 
-    if (this.controlPoints.length === 4) {
-      this.finalizeCurve();
-      this.reset();
+    if (this.previewLine) {
+      this.base.view.scene.remove(this.previewLine);
+      this.disposeObject(this.previewLine);
+      this.previewLine = null;
     }
   }
 
   onMouseMove(data) {
     const { point } = data;
-    if (point && this.controlPoints.length > 0) {
-      this.updatePreview(point);
+    if (point && this.vertices.length >= 1) {
+      this.updateDynamicPreview(point);
     }
   }
 
   onRightClick() {
+    this.finalizeCurve();
     this.reset();
   }
 
-  updatePreview(mousePoint) {
-    const points = this.controlPoints.slice();
-    if (mousePoint) {
-      points.push(mousePoint.slice());
-    }
-
+  updateDynamicPreview(candidatePoint) {
     if (this.previewLine) {
       this.base.view.scene.remove(this.previewLine);
       this.disposeObject(this.previewLine);
       this.previewLine = null;
     }
 
-    if (points.length < 2) return;
+    if (this.vertices.length === 0) return;
 
-    const flatPoints = points.flat();
-    const geometry = new LineGeometry();
-    geometry.setPositions(flatPoints);
-    const material = new LineMaterial({
-      color: 0x888888,
-      linewidth: 1,
+    const vertexClass = (typeof BezierVertex !== 'undefined') ? BezierVertex : globalThis.BezierVertex;
+    const solver = (typeof UpdateControlPoints !== 'undefined') ? UpdateControlPoints : globalThis.UpdateControlPoints;
+
+    const liveVertices = this.vertices.map(v => vertexClass.fromJSON ? vertexClass.fromJSON(v.toJSON()) : new vertexClass(v.point.slice()));
+    const floatingV = new vertexClass(candidatePoint.slice(), 'move');
+    floatingV.curvature = this.currentCurvature;
+    floatingV.balance = this.currentBalance;
+    liveVertices.push(floatingV);
+
+    solver.run(liveVertices, 4);
+
+    const curvePoints = this._generateSplinePoints(liveVertices, 16);
+    if (curvePoints.length < 2) return;
+
+    const flatPositions = curvePoints.flatMap(p => [p.x, p.y, p.z]);
+    const geom = new LineGeometry();
+    geom.setPositions(flatPositions);
+
+    const mat = new LineMaterial({
+      color: 0x38bdf8,
+      linewidth: 3,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.85,
       resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
     });
-    this.previewLine = new Line2(geometry, material);
+
+    this.previewLine = new Line2(geom, mat);
     this.base.view.scene.add(this.previewLine);
-
-    if (this.curvePreview) {
-      this.base.view.scene.remove(this.curvePreview);
-      this.disposeObject(this.curvePreview);
-      this.curvePreview = null;
-    }
-
-    if (this.controlPoints.length === 3 && mousePoint) {
-      const [cp0, cp1, cp2] = this.controlPoints.map(
-        (p) => new THREE.Vector3(...p)
-      );
-      const cp3 = new THREE.Vector3(...mousePoint);
-      const curve = new THREE.CubicBezierCurve3(cp0, cp1, cp2, cp3);
-      const curvePoints = curve.getPoints(50);
-      const curvePositions = curvePoints.flatMap((p) => [p.x, p.y, p.z]);
-
-      const geom = new LineGeometry();
-      geom.setPositions(curvePositions);
-      const mat = new LineMaterial({
-        color: this.base.currentColor
-          ? parseInt(this.base.currentColor.replace('#', ''), 16)
-          : 0xff0000,
-        linewidth: this.base.lineWidth || 4,
-        transparent: true,
-        opacity: 0.7,
-        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
-      });
-      this.curvePreview = new Line2(geom, mat);
-      this.base.view.scene.add(this.curvePreview);
-    }
   }
 
-  finalizeCurve() {
-    const [cp0, cp1, cp2, cp3] = this.controlPoints.map(
-      (p) => new THREE.Vector3(...p)
-    );
-    const curve = new THREE.CubicBezierCurve3(cp0, cp1, cp2, cp3);
-    const curvePoints = curve.getPoints(50);
-    const positions = curvePoints.flatMap((p) => [p.x, p.y, p.z]);
+  updatePermanentCurve() {
+    if (this.curveLine) {
+      this.base.view.scene.remove(this.curveLine);
+      this.disposeObject(this.curveLine);
+      this.curveLine = null;
+    }
 
-    const geometry = new LineGeometry();
-    geometry.setPositions(positions);
-    const material = new LineMaterial({
-      color: this.base.currentColor
-        ? parseInt(this.base.currentColor.replace('#', ''), 16)
-        : 0xff0000,
+    if (this.vertices.length < 2) return;
+
+    const solver = (typeof UpdateControlPoints !== 'undefined') ? UpdateControlPoints : globalThis.UpdateControlPoints;
+    solver.run(this.vertices, 8);
+
+    const curvePoints = this._generateSplinePoints(this.vertices, 24);
+    if (curvePoints.length < 2) return;
+
+    const flatPositions = curvePoints.flatMap(p => [p.x, p.y, p.z]);
+    const geom = new LineGeometry();
+    geom.setPositions(flatPositions);
+
+    const color = this.base.currentColor
+      ? (typeof this.base.currentColor === 'string' ? parseInt(this.base.currentColor.replace('#', ''), 16) : this.base.currentColor)
+      : 0x00ff66;
+
+    const mat = new LineMaterial({
+      color: color,
       linewidth: this.base.lineWidth || 4,
       resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
     });
-    const curveLine = new Line2(geometry, material);
 
-    const curveElement = new CurveElement(this.controlPoints);
-    curveElement.threejsObject = curveLine;
-    curveElement.points = this.controlPoints.map((pt) => pt.slice());
-
-    this.base.cadElements.push(curveElement);
-    this.base.view.scene.add(curveLine);
+    this.curveLine = new Line2(geom, mat);
+    this.base.view.scene.add(this.curveLine);
   }
 
+  _generateSplinePoints(vertices, segmentsPerSpan = 20) {
+    const points = [];
+    for (let i = 0; i < vertices.length - 1; i++) {
+      const vStart = vertices[i];
+      const vEnd = vertices[i + 1];
+
+      const p0 = new THREE.Vector3(vStart.point[0], vStart.point[1], vStart.point[2]);
+      const p1 = new THREE.Vector3(vStart.controlPoints[1][0], vStart.controlPoints[1][1], vStart.controlPoints[1][2]);
+      const p2 = new THREE.Vector3(vEnd.controlPoints[0][0], vEnd.controlPoints[0][1], vEnd.controlPoints[0][2]);
+      const p3 = new THREE.Vector3(vEnd.point[0], vEnd.point[1], vEnd.point[2]);
+
+      const bezier = new THREE.CubicBezierCurve3(p0, p1, p2, p3);
+      const spanPts = bezier.getPoints(segmentsPerSpan);
+      spanPts.forEach(pt => points.push(pt));
+    }
+    return points;
+  }
+
+  finalizeCurve() {
+    if (this.vertices.length < 2) return;
+
+    this.updatePermanentCurve();
+
+    if (this.curveLine) {
+      const curveElement = new CurveElement(this.vertices);
+      curveElement.id = Math.random().toString(36).substr(2, 9);
+      curveElement.color = this.base.currentColor || '#00ff66';
+      curveElement.lineWidth = this.base.lineWidth || 4;
+      curveElement.threejsObject = this.curveLine;
+      curveElement.isTemporary = false;
+
+      this.base.cadElements.push(curveElement);
+      this.curveLine = null;
+    }
+  }
   reset() {
-    this.resetBase();
     if (this.previewLine) {
       this.base.view.scene.remove(this.previewLine);
       this.disposeObject(this.previewLine);
       this.previewLine = null;
     }
-    this.controlSpheres.forEach((sphere) => {
+    if (this.curveLine) {
+      this.base.view.scene.remove(this.curveLine);
+      this.disposeObject(this.curveLine);
+      this.curveLine = null;
+    }
+    this.vertexDots.forEach(sphere => {
       this.base.view.scene.remove(sphere);
       this.disposeObject(sphere);
     });
-    this.controlSpheres = [];
-    if (this.curvePreview) {
-      this.base.view.scene.remove(this.curvePreview);
-      this.disposeObject(this.curvePreview);
-      this.curvePreview = null;
-    }
-    this.controlPoints = [];
+    this.vertexDots = [];
+    this.vertices = [];
+    this.tempElement = null;
+  }
+
+  getCommandSettings() {
+    return [
+      {
+        id: 'curvature',
+        label: 'Curvature (Fullness)',
+        type: 'slider',
+        min: 0.1,
+        max: 2.5,
+        value: this.currentCurvature,
+        callback: (val) => {
+          this.currentCurvature = val;
+          this.vertices.forEach(v => { v.curvature = val; });
+          this.updatePermanentCurve();
+          this.base.refreshMousePosition();
+        }
+      },
+      {
+        id: 'balance',
+        label: 'Balance (Weighting)',
+        type: 'slider',
+        min: 0.1,
+        max: 1.9,
+        value: this.currentBalance,
+        callback: (val) => {
+          this.currentBalance = val;
+          this.vertices.forEach(v => { v.balance = val; });
+          this.updatePermanentCurve();
+          this.base.refreshMousePosition();
+        }
+      }
+    ];
   }
 
   onPoint(data) {
     if (!data) return;
     if (data.mode === 'click') {
-      if (this.onMouseDown) this.onMouseDown(data);
+      this.onMouseDown(data);
     } else if (data.mode === 'hover') {
-      if (this.onMouseMove) this.onMouseMove(data);
+      this.onMouseMove(data);
     }
   }
 
@@ -165,30 +230,23 @@ class DrawCurveCommand {
     object.traverse((child) => {
       if (child.geometry) child.geometry.dispose();
       if (child.material) {
-        if (Array.isArray(child.material)) child.material.forEach((mat) => mat.dispose());
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
         else child.material.dispose();
       }
     });
-  }
-
-  resetBase() {
-    if (this.previewShape) {
-      this.base.view.scene.remove(this.previewShape);
-      this.disposeObject(this.previewShape);
-      this.previewShape = null;
-    }
-    this.tempElement = null;
-  }
-
-  dispose() {
-    if (this.reset) this.reset();
   }
 
   initBase(baseController) {
     this.base = baseController;
     this.tempElement = null;
     this.previewShape = null;
-    this.allowSelfSnap = false;
+    this.allowSelfSnap = true;
   }
 
+  dispose() {
+    this.reset();
+  }
 }
+
+globalThis.DrawCurveCommand = DrawCurveCommand;
+if (typeof module !== 'undefined' && module.exports) module.exports = DrawCurveCommand;

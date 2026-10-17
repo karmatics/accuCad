@@ -38,24 +38,44 @@ class DrawCircleCommand {
   }
 
   finalizeCircle() {
-    if (!this.tempElement || this.tempElement.points.length < 2) return;
+    if (!this.tempElement || !Array.isArray(this.tempElement.points) || this.tempElement.points.length < 2) return;
 
-    const finalShape = this.createCircleVisual(
-      this.tempElement.points[0],
-      this.tempElement.points[1],
-      false
-    );
+    const center = this.tempElement.points[0].slice();
+    const edge = this.tempElement.points[1].slice();
+
+    const finalShape = this.createCircleVisual(center, edge, false);
     if (!finalShape) return;
 
-    const circleElement = new Element();
-    circleElement.type = 'circle';
-    circleElement.points = [this.tempElement.points[0].slice()];
-    circleElement.threejsObject = finalShape;
+    const radius = Math.hypot(
+      edge[0] - center[0],
+      edge[1] - center[1],
+      (edge[2] || 0) - (center[2] || 0)
+    );
+
+    const circleElement = {
+      type: 'circle',
+      id: Math.random().toString(36).substr(2, 9),
+      color: this.base.currentColor || '#00ff00',
+      lineWidth: this.base.lineWidth || 4,
+      points: [center, edge],
+      radius: radius,
+      threejsObject: finalShape,
+      isTemporary: false,
+      toJSON() {
+        return {
+          id: this.id,
+          type: 'circle',
+          color: this.color,
+          lineWidth: this.lineWidth,
+          points: [this.points[0].slice(), this.points[1].slice()],
+          radius: this.radius
+        };
+      }
+    };
 
     this.base.cadElements.push(circleElement);
     this.base.view.scene.add(finalShape);
   }
-
   updatePreviewShape(previewPoint) {
     if (!this.tempElement || this.tempElement.points.length < 1) return;
 

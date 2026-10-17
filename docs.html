@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>accuCad Technical Documentation & Architecture Reference</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; min-height: 100%; background: #0f141c; color: #e2e8f0; font-family: -apple-system, system-ui, sans-serif; }
+    #doc-root { width: 100%; min-height: 100vh; position: relative; }
+  </style>
+  <script src="../Library/DomBasics.js" onerror="this.onerror=null; this.src='/Library/DomBasics.js';"></script>
+  <script src="../Library/UITools.js" onerror="this.onerror=null; this.src='/Library/UITools.js';"></script>
+  <script src="../Library/DocumentReader.js" onerror="this.onerror=null; this.src='/Library/DocumentReader.js';"></script>
+  
+  <!-- Documentation content classes -->
+  <script src="js/docs/AccuCadArchitectureDoc.js"></script>
+  <script src="js/docs/AccuDrawEngineDoc.js"></script>
+  <script src="js/docs/DrawingToolsDoc.js"></script>
+  <script src="js/docs/P2PNetworkingDoc.js"></script>
+</head>
+<body>
+  <div id="doc-root"></div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      if (typeof DomBasics !== 'undefined' && typeof DomBasics.run === 'function') {
+        DomBasics.run();
+      }
+
+      const reader = new DocumentReader({
+        container: document.getElementById('doc-root'),
+        brandTitle: 'accuCad Engine Docs',
+        brandIcon: '📐',
+        pages: [
+          {
+            id: 'architecture',
+            title: 'I. Core Architecture',
+            docClass: () => AccuCadArchitectureDoc
+          },
+          {
+            id: 'accudraw',
+            title: 'II. AccuDraw Precision Engine',
+            docClass: () => AccuDrawEngineDoc
+          },
+          {
+            id: 'tools',
+            title: 'III. Drawing Primitives & Transforms',
+            docClass: () => DrawingToolsDoc
+          },
+          {
+            id: 'networking',
+            title: 'IV. P2P Wireless Protocol',
+            docClass: () => P2PNetworkingDoc
+          }
+        ]
+      });
+
+      reader.init();
+    });
+  </script>
+</body>
+</html>
