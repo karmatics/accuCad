@@ -9,283 +9,211 @@ class SmartDrawKeys {
     }
 
   static registerPlaneCommands(kch, baseController) {
-      // Top View (T)
-      kch.addKeyCommand('top', '', 'top', function (type, keys) {
-        switch (type) {
-          case 'command':
-            baseController.setDrawingPlane('top');
-            return 'Switched plane to TOP';
-          case 'queryactive':
-            this.statusText = ' plane';
-            return true;
-        }
-      });
+        // Top View (T)
+        kch.addKeyCommand('top', '', 'top', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          switch (type) {
+            case 'command':
+              if (bc) bc.setDrawingPlane('top');
+              return 'Switched plane to TOP';
+            case 'queryactive':
+              this.statusText = ' plane';
+              return true;
+          }
+        });
 
-      // Front View (F)
-      kch.addKeyCommand('front', '', 'front', function (type, keys) {
-        switch (type) {
-          case 'command':
-            baseController.setDrawingPlane('front');
-            return 'Switched plane to FRONT';
-          case 'queryactive':
-            this.statusText = ' plane';
-            return true;
-        }
-      });
+        // Front View (F)
+        kch.addKeyCommand('front', '', 'front', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          switch (type) {
+            case 'command':
+              if (bc) bc.setDrawingPlane('front');
+              return 'Switched plane to FRONT';
+            case 'queryactive':
+              this.statusText = ' plane';
+              return true;
+          }
+        });
 
-      // Side View (S)
-      kch.addKeyCommand('side', '', 'side', function (type, keys) {
-        switch (type) {
-          case 'command':
-            baseController.setDrawingPlane('side');
-            return 'Switched plane to SIDE';
-          case 'queryactive':
-            this.statusText = ' plane';
-            return true;
-        }
-      });
-    }
+        // Side View (S)
+        kch.addKeyCommand('side', '', 'side', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          switch (type) {
+            case 'command':
+              if (bc) bc.setDrawingPlane('side');
+              return 'Switched plane to SIDE';
+            case 'queryactive':
+              this.statusText = ' plane';
+              return true;
+          }
+        });
+      }
 
   static registerAccuDrawCommands(kch, baseController) {
-    kch.addKeyCommand(
-      '&keyboard shortcuts',
-      '',
-      'show keyboard shortcuts',
-      function (type, keys) {
-        switch (type) {
-          case 'command':
-            SmartDrawKeys.showHelpDialog(baseController);
-            return null;
-          case 'queryactive':
-            return true;
-        }
-      }
-    );
-
-    kch.addKeyCommand('lock', '', 'smart lock', function (type, keys) {
-      switch (type) {
-        case 'command':
-          if (baseController.accuDrawLogic) {
-            baseController.accuDrawLogic.handleSmartLock();
+        kch.addKeyCommand(
+          '&keyboard shortcuts',
+          '',
+          'show keyboard shortcuts',
+          function (type, keys) {
+            const bc = BaseController.getActiveController() || baseController;
+            switch (type) {
+              case 'command':
+                SmartDrawKeys.showHelpDialog(bc);
+                return null;
+              case 'queryactive':
+                return true;
+            }
           }
-          return 'Smart Lock';
-        case 'queryactive':
-          if (baseController.accuDrawLogic) {
-            const l = baseController.accuDrawLogic;
-            const anyLocked =
-              l.isLocked.x ||
-              l.isLocked.y ||
-              l.isLocked.dist ||
-              l.isLocked.angle;
-            this.statusText = anyLocked ? ' (locked)' : '';
+        );
+
+        kch.addKeyCommand('lock', '', 'smart lock', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          switch (type) {
+            case 'command':
+              if (bc?.accuDrawLogic) {
+                bc.accuDrawLogic.handleSmartLock();
+              }
+              return 'Smart Lock';
+            case 'queryactive':
+              if (bc?.accuDrawLogic) {
+                const l = bc.accuDrawLogic;
+                const anyLocked =
+                  l.isLocked.x ||
+                  l.isLocked.y ||
+                  l.isLocked.dist ||
+                  l.isLocked.angle;
+                this.statusText = anyLocked ? ' (locked)' : '';
+              }
+              return true;
+          }
+        });
+
+        kch.addKeyCommand('SPACE', '', 'mode toggle', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          switch (type) {
+            case 'command':
+              if (bc?.accuDrawLogic) {
+                bc.accuDrawLogic.switchMode();
+              }
+              return 'Mode: ' + (bc?.accuDrawLogic ? bc.accuDrawLogic.mode : '?');
+            case 'queryactive':
+              if (bc?.accuDrawLogic) {
+                this.statusText = ' (' + bc.accuDrawLogic.mode + ')';
+              }
+              return true;
+          }
+        });
+
+        // 'G' (Go / Set Origin) - Left-Hand Home-Row Shortcut
+        kch.addKeyCommand('g', '', 'set origin (home-row)', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          if (type === 'command' && bc) {
+            const pointToUse = bc._tentativeOriginalPoint || bc.getLastWorldPoint();
+            if (pointToUse) {
+              bc.setOrigin(pointToUse);
+            }
+            if (bc._tentativeOriginalPoint) {
+              TentativePointHandler._clearTentativePoint(bc);
+            }
+            return 'Origin Set [G]';
           }
           return true;
-      }
-    });
+        });
 
-    kch.addKeyCommand('SPACE', '', 'mode toggle', function (type, keys) {
-      switch (type) {
-        case 'command':
-          if (baseController.accuDrawLogic) {
-            baseController.accuDrawLogic.switchMode();
-          }
-          return (
-            'Mode: ' +
-            (baseController.accuDrawLogic
-              ? baseController.accuDrawLogic.mode
-              : '?')
-          );
-        case 'queryactive':
-          if (baseController.accuDrawLogic) {
-            this.statusText = ' (' + baseController.accuDrawLogic.mode + ')';
+        // 'O' (Legacy Origin)
+        kch.addKeyCommand('&get origin', '', 'origin (legacy)', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          if (type === 'command' && bc) {
+            const pointToUse = bc._tentativeOriginalPoint || bc.getLastWorldPoint();
+            if (pointToUse) {
+              bc.setOrigin(pointToUse);
+            }
+            if (bc._tentativeOriginalPoint) {
+              TentativePointHandler._clearTentativePoint(bc);
+            }
+            return 'Origin Set [O]';
           }
           return true;
-      }
-    });
+        });
 
-    kch.addKeyCommand('&get origin', '', 'origin', function (type, keys) {
-      if (type === 'command') {
-        const pointToUse = baseController.getLastWorldPoint();
-        if (pointToUse) {
-          baseController.setOrigin(pointToUse);
-        }
-        if (baseController._tentativeOriginalPoint) {
-          TentativePointHandler._clearTentativePoint(baseController);
-        }
-      }
-      return true;
-    });
-
-    // Q: Instant Surface Normal Alignment (R, Q in original AccuDraw)
-    kch.addKeyCommand('q', '', 'align to surface normal', function (type, keys) {
-      if (type === 'command') {
-        if (baseController._tentativeNormal) {
-          const normal = baseController._tentativeNormal;
-          const zAxis = new THREE.Vector3(...normal).normalize();
-          let up = Math.abs(zAxis.y) > 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
-          const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
-          const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
-
-          const matrix = [
-            [xAxis.x, xAxis.y, xAxis.z],
-            [yAxis.x, yAxis.y, yAxis.z],
-            [zAxis.x, zAxis.y, zAxis.z]
-          ];
-
-          baseController.rotationMatrix = matrix;
-          if (baseController.accuDraw) {
-            baseController.accuDraw.setRotationAnimated(matrix, 0.3);
+        // 'N' (Nearest Element Intersection along locked axis ray)
+        kch.addKeyCommand('n', '', 'nearest element intersection snap', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          if (type === 'command' && bc) {
+            if (bc.accuDrawLogic) {
+              bc.accuDrawLogic.snapMode = 'nearest_intersection';
+            }
+            bc.refreshMousePosition();
+            return 'Nearest Intersection Snap [N]';
           }
-          if (baseController.accuDrawLogic) {
-            baseController.accuDrawLogic.setRotation(matrix);
+          return true;
+        });
+
+        // Q: Instant Surface Normal Alignment
+        kch.addKeyCommand('q', '', 'align to surface normal', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          if (type === 'command' && bc) {
+            if (bc._tentativeNormal) {
+              const normal = bc._tentativeNormal;
+              const zAxis = new THREE.Vector3(...normal).normalize();
+              let up = Math.abs(zAxis.y) > 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
+              const xAxis = new THREE.Vector3().crossVectors(up, zAxis).normalize();
+              const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+
+              const matrix = [
+                [xAxis.x, xAxis.y, xAxis.z],
+                [yAxis.x, yAxis.y, yAxis.z],
+                [zAxis.x, zAxis.y, zAxis.z]
+              ];
+
+              bc.rotationMatrix = matrix;
+              if (bc.accuDraw) {
+                bc.accuDraw.setRotationAnimated(matrix, 0.3);
+              }
+              if (bc.accuDrawLogic) {
+                bc.accuDrawLogic.setRotation(matrix);
+              }
+              bc.refreshMousePosition();
+              return 'Aligned to Surface Normal';
+            }
+            return 'No surface normal selected';
           }
-          baseController.refreshMousePosition();
-          return 'Aligned to Surface Normal';
-        }
-        return 'No surface normal selected';
-      }
-      if (type === 'queryactive') return true;
-    });
+          if (type === 'queryactive') return true;
+        });
 
-    kch.addKeyCommand('x', '', 'lock X', function (type, keys) {
-      if (type === 'command') {
-        if (baseController.accuDrawLogic)
-          baseController.accuDrawLogic.toggleLock('x');
-        return 'X Toggled';
-      }
-      return true;
-    });
+        kch.addKeyCommand('x', '', 'lock X', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          if (type === 'command' && bc?.accuDrawLogic) {
+            bc.accuDrawLogic.toggleLock('x');
+            return 'X Toggled';
+          }
+          return true;
+        });
 
-    kch.addKeyCommand('y', '', 'lock Y', function (type, keys) {
-      if (type === 'command') {
-        if (baseController.accuDrawLogic)
-          baseController.accuDrawLogic.toggleLock('y');
-        return 'Y Toggled';
-      }
-      return true;
-    });
+        kch.addKeyCommand('y', '', 'lock Y', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          if (type === 'command' && bc?.accuDrawLogic) {
+            bc.accuDrawLogic.toggleLock('y');
+            return 'Y Toggled';
+          }
+          return true;
+        });
 
-    kch.addKeyCommand('z', '', 'lock Z', function (type, keys) {
-      if (type === 'command') {
-        if (baseController.accuDrawLogic) {
-          baseController.accuDrawLogic.toggleLock('z');
-          baseController.zPlaneLocked = baseController.accuDrawLogic.isLocked.z;
-        } else {
-          baseController.zPlaneLocked = !baseController.zPlaneLocked;
-        }
-        baseController.refreshMousePosition();
-        return 'Z ' + (baseController.zPlaneLocked ? 'Locked' : 'Unlocked');
-      }
-      return true;
-    });
-
-    // D: Lock Polar Distance (Bentley AccuDrawSetLockDistanceTool parity)
-    kch.addKeyCommand('&distance lock', '', 'lock polar distance', function (type, keys) {
-      if (type === 'command') {
-        if (baseController.accuDrawLogic) {
-          baseController.accuDrawLogic.toggleLock('dist');
-        }
-        return 'Distance Lock Toggled';
-      }
-      return true;
-    });
-
-    // A: Lock Polar Angle (Bentley AccuDrawSetLockAngleTool parity)
-    kch.addKeyCommand('&angle lock', '', 'lock polar angle', function (type, keys) {
-      if (type === 'command') {
-        if (baseController.accuDrawLogic) {
-          baseController.accuDrawLogic.toggleLock('angle');
-        }
-        return 'Angle Lock Toggled';
-      }
-      return true;
-    });
-
-    function scaleExponentially(num) {
-      if (num < 0 || num > 9) throw new Error('Input must be between 0 and 9');
-      let min = 1.5;
-      let max = 300;
-      let base = Math.pow(max / min, 1 / 9);
-      return min * Math.pow(base, num);
-    }
-
-    kch.addKeyCommand(
-      'accudraw',
-      'size #0-9',
-      'set the compass size to a number 0 and 9',
-      function (type, keys) {
-        switch (type) {
-          case 'command':
-            var v = parseInt(keys[1]);
-            var s = scaleExponentially(v);
-            if (baseController?.accuDraw?.setSizeAnimated) {
-              baseController.accuDraw.setSizeAnimated(s / 40, 0.5);
+        kch.addKeyCommand('z', '', 'lock Z', function (type, keys) {
+          const bc = BaseController.getActiveController() || baseController;
+          if (type === 'command' && bc) {
+            if (bc.accuDrawLogic) {
+              bc.accuDrawLogic.toggleLock('z');
+              bc.zPlaneLocked = bc.accuDrawLogic.isLocked.z;
+            } else {
+              bc.zPlaneLocked = !bc.zPlaneLocked;
             }
-            return 'size set to ' + s;
-          case 'queryactive':
-            this.statusText = ' (current: ' + 9 + ')';
-            return true;
-        }
+            bc.refreshMousePosition();
+            return 'Z ' + (bc.zPlaneLocked ? 'Locked' : 'Unlocked');
+          }
+          return true;
+        });
       }
-    );
-
-    kch.addKeyCommand(
-      'accudraw',
-      'ui',
-      'toggles the visibility of the accudraw panel',
-      function (type, keys) {
-        switch (type) {
-          case 'command':
-            if (baseController.accuDraw && baseController.accuDraw.ui) {
-              baseController.accuDraw.ui.toggle();
-            }
-            return 'Toggled AccuDraw UI';
-          case 'queryactive':
-            return true;
-        }
-      }
-    );
-
-    kch.addKeyCommand(
-      'accudraw',
-      '&diagnostics',
-      'toggle the accudraw diagnostics panel',
-      function (type, keys) {
-        switch (type) {
-          case 'command':
-            if (!baseController.accuDrawDiagnostics) {
-              baseController.accuDrawDiagnostics = new AccuDrawDiagnostics(
-                baseController
-              );
-            }
-            baseController.accuDrawDiagnostics.toggle();
-            return 'Toggled Diagnostics';
-          case 'queryactive':
-            return true;
-        }
-      }
-    );
-
-    kch.addKeyCommand(
-      'accudraw',
-      'test harness',
-      'open the accudraw test harness',
-      function (type, keys) {
-        switch (type) {
-          case 'command':
-            if (!baseController.accuDrawTestHarness) {
-              baseController.accuDrawTestHarness = new AccuDrawTestHarness(
-                baseController
-              );
-            }
-            baseController.accuDrawTestHarness.toggle();
-            return 'Toggled Test Harness';
-          case 'queryactive':
-            return true;
-        }
-      }
-    );
-  }
   static registerDrawingCommands(kch, baseController) {
       kch.addKeyCommand(
         'command',

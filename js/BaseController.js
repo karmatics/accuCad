@@ -2,65 +2,77 @@
 class BaseController {
 
   constructor(threeDView, domElem) {
-    this.view = threeDView;
-    this.domElement = domElem || threeDView.renderer.domElement;
-    this.cadElements = [];
+      this.view = threeDView;
+      this.domElement = domElem || threeDView.renderer.domElement;
+      this.cadElements = [];
 
-    this.currentColor = '#0088FF';
-    this.lineWidth = 4;
-    this.origin = [0, 0, 0];
-    this.basePlaneMatrix = [
-      [1, 0, 0],
-      [0, 0, -1],
-      [0, 1, 0]
-    ];
-    this.rotationMatrix = [
-      [1, 0, 0],
-      [0, 0, -1],
-      [0, 1, 0]
-    ];
-    this.originVisible = true;
-    this.floatingOrigin = true;
-    this.zPlaneLocked = false;
-    this.activeCommand = null;
-    this.commands = {};
-    this.previousPoints = [];
-    this.gridHelper = new THREE.GridHelper(20, 20);
-    this.gridHelper.userData.isPickable = false;
-    this.view.scene.add(this.gridHelper);
-    this.tentativeMarker = null;
-    this.tentativeProjectionLine = null;
-    this._highlightedElement = null;
-    this._tentativeTimeout = null;
-    this._lastMousePosition = null;
-    this._lastWorldPoint = null;
-    this._lastControlMousePos = null;
-    this._ctrlDown = false;
-    this._lockedHoverPoint = null;
-    this._lastMetaWorldPoint = null;
-    this.indexEnabled = true;
-    this.indexTolerance = 0.2;
-    this._shiftDown = false;
+      this.currentColor = '#0088FF';
+      this.lineWidth = 4;
+      this.origin = [0, 0, 0];
+      this.basePlaneMatrix = [
+        [1, 0, 0],
+        [0, 0, -1],
+        [0, 1, 0]
+      ];
+      this.rotationMatrix = [
+        [1, 0, 0],
+        [0, 0, -1],
+        [0, 1, 0]
+      ];
+      this.originVisible = true;
+      this.floatingOrigin = true;
+      this.zPlaneLocked = false;
+      this.activeCommand = null;
+      this.commands = {};
+      this.previousPoints = [];
+      this.gridHelper = new THREE.GridHelper(20, 20);
+      this.gridHelper.userData.isPickable = false;
+      this.view.scene.add(this.gridHelper);
+      this.tentativeMarker = null;
+      this.tentativeProjectionLine = null;
+      this._highlightedElement = null;
+      this._tentativeTimeout = null;
+      this._lastMousePosition = null;
+      this._lastWorldPoint = null;
+      this._lastControlMousePos = null;
+      this._ctrlDown = false;
+      this._lockedHoverPoint = null;
+      this._lastMetaWorldPoint = null;
+      this.indexEnabled = true;
+      this.indexTolerance = 0.2;
+      this._shiftDown = false;
 
-    this.commandControlValue = 0.25;
+      this.commandControlValue = 0.25;
 
-    this.chordThreshold = 50;
-    this.leftDownTime = null;
-    this.rightDownTime = null;
-    this.pendingClickTimer = null;
+      this.chordThreshold = 50;
+      this.leftDownTime = null;
+      this.rightDownTime = null;
+      this.pendingClickTimer = null;
 
-    this.accuDrawLogic = new AccuDrawLogic(this);
+      this.accuDrawLogic = new AccuDrawLogic(this);
 
-    // Instantiates the headless contract bridge connecting CADCraft, iTwin hints, and MCP
-    if (typeof CompassDrawBridge !== 'undefined') {
-      this.compassDrawBridge = new CompassDrawBridge(this);
-      this.compassDrawBridge.listenHostPostMessages();
-    } else {
-      this.compassDrawBridge = null;
+      // Instantiates the headless contract bridge connecting CADCraft, iTwin hints, and MCP
+      if (typeof CompassDrawBridge !== 'undefined') {
+        this.compassDrawBridge = new CompassDrawBridge(this);
+        this.compassDrawBridge.listenHostPostMessages();
+      } else {
+        this.compassDrawBridge = null;
+      }
+
+      // Set as the active global controller for unified key routing
+      BaseController.activeController = this;
+
+      // Listen for pointer activation to dynamically transfer active controller focus
+      if (this.domElement) {
+        this._focusListener = () => {
+          BaseController.activeController = this;
+        };
+        this.domElement.addEventListener('pointerdown', this._focusListener, { capture: true, passive: true });
+        this.domElement.addEventListener('mouseenter', this._focusListener, { passive: true });
+      }
+
+      EventHandlers.setupEventListeners(this);
     }
-
-    EventHandlers.setupEventListeners(this);
-  }
   _storePoint(pointData) {
     this.previousPoints.push(pointData);
     if (this.previousPoints.length > 10) {
@@ -279,6 +291,16 @@ class BaseController {
           }
         }
       };
+    }
+
+  static getActiveController() {
+      if (BaseController.activeController) {
+        return BaseController.activeController;
+      }
+      if (typeof globalThis.baseController !== 'undefined') {
+        return globalThis.baseController;
+      }
+      return null;
     }
 }
 if (typeof window !== 'undefined') window.BaseController = BaseController;
