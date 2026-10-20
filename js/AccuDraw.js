@@ -1,74 +1,77 @@
 
 class AccuDraw {
+
   constructor(threeDView, options = {}) {
-    this.threeDView = threeDView;
-    this.options = Object.assign(
-      {
-        squircleAmount: 0.5,
-        center: [0, 0, 0],
-        rotationMatrix: [
-          [1, 0, 0],
-          [0, 1, 0],
-          [0, 0, 1],
-        ],
-        color: 0x88ccff,
-        outlineThickness: 2,
-        opacity: 0.5,
-        size: 1,
-        depthTest: true,
-        mode: 'arc',
-        cameraOffset: 0.01,
-      },
-      options
-    );
+      this.threeDView = threeDView;
+      this.options = Object.assign(
+        {
+          squircleAmount: 0.5,
+          center: [0, 0, 0],
+          rotationMatrix: [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+          ],
+          color: 0x88ccff,
+          outlineThickness: 2,
+          opacity: 0.5,
+          size: 1,
+          depthTest: true,
+          mode: 'arc',
+          cameraOffset: 0.01,
+          showUi: true, // Configurable toggle to allow isolated views without spawning floating DOM HUD
+        },
+        options
+      );
 
-    // Store reference to baseController if provided, so UI children can reach accuDrawLogic
-    this.baseController = options.baseController || null;
+      this.baseController = options.baseController || null;
 
-    this.group = new THREE.Group();
-    this.group.userData.isPickable = false;
+      this.group = new THREE.Group();
+      this.group.userData.isPickable = false;
 
-    this.marker3D = new Squircle3D(this.threeDView, this.options);
-    this.marker3D.getObject3D().userData.isPickable = false;
-    this.group.add(this.marker3D.getObject3D());
+      this.marker3D = new Squircle3D(this.threeDView, this.options);
+      this.marker3D.getObject3D().userData.isPickable = false;
+      this.group.add(this.marker3D.getObject3D());
 
-    // Initialize tick storage
-    this.axisTicks = { x: [], y: [] };
+      this.axisTicks = { x: [], y: [] };
 
-    this._createDecorations();
-    this.isAnimating = 0;
+      this._createDecorations();
+      this.isAnimating = 0;
 
-    // Index Line (The white constraint line)
-    const lineGeometry = new LineGeometry();
-    lineGeometry.setPositions([0, 0, 0, 0, 0, 0]);
+      // Index Line (The white constraint line)
+      const lineGeometry = new LineGeometry();
+      lineGeometry.setPositions([0, 0, 0, 0, 0, 0]);
 
-    const lineMaterial = new LineMaterial({
-      color: 0xffffff,
-      linewidth: 4,
-      resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
-      depthTest: false,
-      depthWrite: false,
-      dashed: false,
-      transparent: true,
-      opacity: 1.0,
-    });
+      const lineMaterial = new LineMaterial({
+        color: 0xffffff,
+        linewidth: 4,
+        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        depthTest: false,
+        depthWrite: false,
+        dashed: false,
+        transparent: true,
+        opacity: 1.0,
+      });
 
-    this.indexIndicator = new Line2(lineGeometry, lineMaterial);
-    this.indexIndicator.userData.isPickable = false;
-    this.indexIndicator.visible = false;
-    this.indexIndicator.renderOrder = 99999;
+      this.indexIndicator = new Line2(lineGeometry, lineMaterial);
+      this.indexIndicator.userData.isPickable = false;
+      this.indexIndicator.visible = false;
+      this.indexIndicator.renderOrder = 99999;
 
-    this.group.add(this.indexIndicator);
+      this.group.add(this.indexIndicator);
 
-    // Projected Marker (The Mini-Jack)
-    this.projectedMarker = this._createMiniJack();
-    this.projectedMarker.visible = false;
-    this.threeDView.scene.add(this.projectedMarker);
+      // Projected Marker (The Mini-Jack)
+      this.projectedMarker = this._createMiniJack();
+      this.projectedMarker.visible = false;
+      this.threeDView.scene.add(this.projectedMarker);
 
-    // Initialize UI
-    this.ui = new AccuDrawUi(this);
+      // Only instantiate floating DOM inputs if UI is requested
+      if (this.options.showUi !== false) {
+        this.ui = new AccuDrawUi(this);
+      } else {
+        this.ui = null;
+      }
   }
-
   _createDecorations() {
     if (this.decorationsGroup) {
       this.group.remove(this.decorationsGroup);

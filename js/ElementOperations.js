@@ -644,6 +644,63 @@ class ElementOperations {
 
       return obj;
     }
+
+  static applyMaterialPreset(target, presetName = 'clearcoat') {
+      if (!target) return false;
+
+      const THREE = globalThis.THREE || (typeof window !== 'undefined' ? window.THREE : null);
+      if (!THREE) return false;
+
+      const meshes = [];
+      if (target.isMesh) {
+        meshes.push(target);
+      } else if (target.traverse) {
+        target.traverse((child) => {
+          if (child.isMesh && child.userData.isCompassPart !== true && child.userData.isPickable !== false) {
+            meshes.push(child);
+          }
+        });
+      }
+
+      if (meshes.length === 0) return false;
+
+      meshes.forEach((mesh) => {
+        if (!mesh.material) return;
+
+        // Ensure material is a physical/standard material capable of clearcoats
+        if (!(mesh.material instanceof THREE.MeshPhysicalMaterial)) {
+          const oldColor = mesh.material.color ? mesh.material.color.clone() : new THREE.Color(0x38bdf8);
+          mesh.material.dispose();
+          mesh.material = new THREE.MeshPhysicalMaterial({ color: oldColor });
+        }
+
+        const mat = mesh.material;
+
+        if (presetName === 'clearcoat') {
+          mat.metalness = 0.05;
+          mat.roughness = 0.15;
+          mat.clearcoat = 1.0;
+          mat.clearcoatRoughness = 0.05;
+          mat.reflectivity = 0.9;
+        } else if (presetName === 'titanium') {
+          mat.metalness = 0.85;
+          mat.roughness = 0.25;
+          mat.clearcoat = 0.2;
+          mat.clearcoatRoughness = 0.2;
+          mat.reflectivity = 0.7;
+        } else if (presetName === 'clay') {
+          mat.metalness = 0.0;
+          mat.roughness = 0.85;
+          mat.clearcoat = 0.0;
+          mat.clearcoatRoughness = 0.0;
+          mat.reflectivity = 0.2;
+        }
+
+        mat.needsUpdate = true;
+      });
+
+      return true;
+  }
 }
 if (typeof window !== 'undefined') window.ElementOperations = ElementOperations;
 globalThis.ElementOperations = ElementOperations;

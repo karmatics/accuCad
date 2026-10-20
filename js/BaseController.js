@@ -302,6 +302,64 @@ class BaseController {
       }
       return null;
     }
+
+  alignToSurfaceNormal(normalVector) {
+      if (!normalVector) return null;
+
+      const THREE = this.view?.renderer?.domElement ? globalThis.THREE : null;
+      const len = Math.hypot(normalVector[0] || normalVector.x, normalVector[1] || normalVector.y, normalVector[2] || normalVector.z);
+      if (len < 1e-9) return null;
+
+      const nx = (normalVector[0] !== undefined ? normalVector[0] : normalVector.x) / len;
+      const ny = (normalVector[1] !== undefined ? normalVector[1] : normalVector.y) / len;
+      const nz = (normalVector[2] !== undefined ? normalVector[2] : normalVector.z) / len;
+
+      // Gram-Schmidt derivation of non-flipping orthogonal basis
+      let upX = 0, upY = 1, upZ = 0;
+      if (Math.abs(ny) > 0.95) {
+        upX = 0; upY = 0; upZ = 1;
+      }
+
+      // X = normalize(up x normal)
+      let xx = upY * nz - upZ * ny;
+      let xy = upZ * nx - upX * nz;
+      let xz = upX * ny - upY * nx;
+      const xLen = Math.hypot(xx, xy, xz) || 1;
+      xx /= xLen; xy /= xLen; xz /= xLen;
+
+      // Y = normal x X
+      const yx = ny * xz - nz * xy;
+      const yy = nz * xx - nx * xz;
+      const yz = nx * xy - ny * xx;
+
+      const matrix = [
+        [xx, xy, xz],
+        [yx, yy, yz],
+        [nx, ny, nz]
+      ];
+
+      this.rotationMatrix = matrix;
+
+      if (this.accuDraw && typeof this.accuDraw.setRotationAnimated === 'function') {
+        this.accuDraw.setRotationAnimated(matrix, 0.3);
+      }
+      if (this.accuDrawLogic) {
+        this.accuDrawLogic.setRotation(matrix);
+      }
+
+      this.refreshMousePosition();
+      return matrix;
+  }
+
+  setMaterialPreset(presetName = 'clearcoat') {
+      if (typeof ElementOperations !== 'undefined' && typeof ElementOperations.applyMaterialPreset === 'function') {
+        const scene = this.view?.scene;
+        if (scene) {
+          return ElementOperations.applyMaterialPreset(scene, presetName);
+        }
+      }
+      return false;
+  }
 }
 if (typeof window !== 'undefined') window.BaseController = BaseController;
 globalThis.BaseController = BaseController;

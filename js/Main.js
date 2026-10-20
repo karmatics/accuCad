@@ -11,228 +11,224 @@ class Main {
       globalThis.baseController = baseController;
   }
 
-  async run(env) {
-    console.log('[accuCad] run() invoked.');
-    if (this.rootElement) this.destroy();
+  async run(env, options = {}) {
+      console.log('[accuCad] run() invoked.');
+      if (this.rootElement) this.destroy();
 
-    if (!env || !env.container) {
-      throw new Error(
-        '[accuCad] run() requires an environment object with a valid container.'
-      );
-    }
-
-    const parentElement = env.container;
-    this.rootElement = parentElement;
-
-    const resetScroll = () => {
-      if (this.rootElement) {
-        this.rootElement.scrollLeft = 0;
-        this.rootElement.scrollTop = 0;
+      if (!env || !env.container) {
+        throw new Error(
+          '[accuCad] run() requires an environment object with a valid container.'
+        );
       }
-      window.scrollTo(0, 0);
-      document.body.scrollLeft = 0;
-      document.body.scrollTop = 0;
-    };
 
-    this.rootElement.addEventListener('scroll', resetScroll);
-    window.addEventListener('scroll', resetScroll);
-    document.body.addEventListener('scroll', resetScroll);
-    this._scrollResetHandler = resetScroll;
+      const opts = Object.assign({
+        showSidePanel: true,
+        showCompass: true,
+        showCompassUi: false,
+        cameraPos: { x: 5, y: 5, z: 8 },
+        target: [0, 0.4, 0],
+        background: 0x090d16,
+        enableControls: true,
+        presetGeometry: null,
+        initialTool: 'rectangle',
+        initialPlane: 'top',
+        squircle: 0.35,
+        compassSize: 0.85
+      }, env, options);
 
-    const layoutWrapper = document.createElement('div');
-    layoutWrapper.id = 'accucad-layout-wrapper';
-    layoutWrapper.style.cssText =
-      'display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; position: relative;';
-    parentElement.appendChild(layoutWrapper);
-    this.layoutWrapper = layoutWrapper;
+      const parentElement = env.container;
+      this.rootElement = parentElement;
 
-    const canvasId = 'accucad-canvas-' + Math.random().toString(36).slice(2);
-    const canvasContainer = document.createElement('div');
-    canvasContainer.id = canvasId;
-    canvasContainer.style.cssText =
-      'flex-grow: 1; height: 100%; position: relative; overflow: hidden;';
-    layoutWrapper.appendChild(canvasContainer);
-    this.canvasContainer = canvasContainer;
+      const resetScroll = () => {
+        if (this.rootElement) {
+          this.rootElement.scrollLeft = 0;
+          this.rootElement.scrollTop = 0;
+        }
+        window.scrollTo(0, 0);
+        document.body.scrollLeft = 0;
+        document.body.scrollTop = 0;
+      };
 
-    if (
-      !parentElement._vibesAppResizeObserver &&
-      typeof ResizeObserver !== 'undefined'
-    ) {
-      const ro = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          if (this.app && typeof this.app.resize === 'function') {
-            this.app.resize(entry.contentRect.width, entry.contentRect.height);
+      this.rootElement.addEventListener('scroll', resetScroll);
+      window.addEventListener('scroll', resetScroll);
+      document.body.addEventListener('scroll', resetScroll);
+      this._scrollResetHandler = resetScroll;
+
+      const layoutWrapper = document.createElement('div');
+      layoutWrapper.id = 'accucad-layout-wrapper';
+      layoutWrapper.style.cssText =
+        'display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; position: relative;';
+      parentElement.appendChild(layoutWrapper);
+      this.layoutWrapper = layoutWrapper;
+
+      const canvasId = 'accucad-canvas-' + Math.random().toString(36).slice(2);
+      const canvasContainer = document.createElement('div');
+      canvasContainer.id = canvasId;
+      canvasContainer.style.cssText =
+        'flex-grow: 1; width: 100%; height: 100%; position: relative; overflow: hidden;';
+      layoutWrapper.appendChild(canvasContainer);
+      this.canvasContainer = canvasContainer;
+
+      if (
+        !parentElement._vibesAppResizeObserver &&
+        typeof ResizeObserver !== 'undefined'
+      ) {
+        const ro = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            if (this.app && typeof this.app.resize === 'function') {
+              this.app.resize(entry.contentRect.width, entry.contentRect.height);
+            }
           }
-        }
-      });
-      ro.observe(canvasContainer);
-      parentElement._vibesAppResizeObserver = ro;
-    }
-
-    const staticClasses = [
-      'CameraOrbitAnimator',
-      'DebugConfig',
-      'ElementOperations',
-      'ModelLoader',
-      'TentativePointHandler',
-      'ViewControlsManager',
-      'ViewManipulator',
-    ];
-    for (const clsName of staticClasses) {
-      const cls = window[clsName] || globalThis[clsName];
-      if (cls && typeof cls.initStatics === 'function') cls.initStatics();
-    }
-
-    if (typeof PopupBox !== 'undefined' && typeof PopupBox.init === 'function') {
-      PopupBox.init();
-    }
-
-    // accuCad does not need HDR environment reflections; disable environment map to eliminate 404
-    this.app = new ThreeJSLoader(canvasId, {
-      cameraPos: { x: 5, y: 5, z: 8 },
-      enableControls: false,
-      useThickLines: true,
-      commonLoaders: true,
-      environment: false,
-      lighting: true,
-      onUpdate: () => this._onUpdate?.(),
-    });
-
-    await this.app.init(canvasContainer);
-
-    this.THREE = this.app.THREE || window.THREE;
-    if (this.app.scene) {
-      this.app.scene.background = new this.THREE.Color(0x222222);
-    }
-
-    const target = new this.THREE.Vector3(0, 0.6, 0);
-    this.app.camera.lookAt(target);
-
-    this.threeDView = {
-      scene: this.app.scene,
-      camera: this.app.camera,
-      renderer: this.app.renderer,
-      target: target,
-      envRotation: 0,
-    };
-
-    this.baseController = new BaseController(
-      this.threeDView,
-      this.app.renderer.domElement
-    );
-    ControllerSetup.initializeController(
-      this.baseController,
-      this.threeDView.scene
-    );
-
-    // Setup SidePanel UI structure
-    if (typeof SidePanel !== 'undefined') {
-      const sidePanelEnv = { container: layoutWrapper };
-      this.sidePanel = new SidePanel('left', 260, sidePanelEnv);
-
-      this.sidePanel.toolSettingsSection = this.sidePanel.addSection(
-        'setup',
-        'Tool Settings',
-        true
-      );
-      this.sidePanel.compassSection = this.sidePanel.addSection(
-        'compass',
-        'Compass Controls',
-        true
-      );
-      this.sidePanel.p2pSection = this.sidePanel.addSection(
-        'p2p',
-        'Controller',
-        false
-      );
-
-      this.baseController.sidePanel = this.sidePanel;
-      layoutWrapper.insertBefore(this.sidePanel.element, canvasContainer);
-      this._setupToolSettingsWatcher();
-
-      if (typeof CadStorageManager !== 'undefined') {
-        this.storageManager = new CadStorageManager(this.baseController);
-        this.storageManager.renderUI();
+        });
+        ro.observe(canvasContainer);
+        parentElement._vibesAppResizeObserver = ro;
       }
 
-      this.sidePanel.open();
-    }
+      const staticClasses = [
+        'CameraOrbitAnimator',
+        'DebugConfig',
+        'ElementOperations',
+        'ModelLoader',
+        'TentativePointHandler',
+        'ViewControlsManager',
+        'ViewManipulator',
+      ];
+      for (const clsName of staticClasses) {
+        const cls = window[clsName] || globalThis[clsName];
+        if (cls && typeof cls.initStatics === 'function') cls.initStatics();
+      }
 
-    // Initialize P2P Wireless Remote Connector
-    if (typeof P2PConnector !== 'undefined') {
-      this.baseController.p2pConnector = new P2PConnector(this.baseController);
-      if (this.sidePanel && this.sidePanel.p2pSection) {
-        this.baseController.p2pConnector.renderControls(
-          this.sidePanel.p2pSection
+      if (typeof PopupBox !== 'undefined' && typeof PopupBox.init === 'function') {
+        PopupBox.init();
+      }
+
+      this.app = new ThreeJSLoader(canvasId, {
+        cameraPos: opts.cameraPos,
+        enableControls: opts.enableControls,
+        useThickLines: true,
+        commonLoaders: true,
+        environment: false,
+        lighting: true,
+        onUpdate: () => this._onUpdate?.(),
+      });
+
+      await this.app.init(canvasContainer);
+
+      this.THREE = this.app.THREE || window.THREE;
+      if (this.app.scene) {
+        this.app.scene.background = new this.THREE.Color(opts.background);
+      }
+
+      const target = new this.THREE.Vector3(...opts.target);
+      this.app.camera.lookAt(target);
+
+      this.threeDView = {
+        scene: opts.sharedScene || this.app.scene,
+        camera: this.app.camera,
+        renderer: this.app.renderer,
+        target: target,
+        envRotation: 0,
+      };
+
+      if (opts.sharedController) {
+        this.baseController = opts.sharedController;
+      } else {
+        this.baseController = new BaseController(
+          this.threeDView,
+          this.app.renderer.domElement
+        );
+        ControllerSetup.initializeController(
+          this.baseController,
+          this.threeDView.scene
         );
       }
-    }
 
-    if (typeof ViewControlsManager !== 'undefined') {
-      const compassContainer = this.sidePanel
-        ? this.sidePanel.compassSection
-        : null;
-      ViewControlsManager.init(
-        this.baseController,
-        this.threeDView,
-        compassContainer
-      );
-    }
+      // Only mount SidePanel if explicitly requested
+      if (opts.showSidePanel && typeof SidePanel !== 'undefined') {
+        const sidePanelEnv = { container: layoutWrapper };
+        this.sidePanel = new SidePanel('left', 260, sidePanelEnv);
 
-    if (typeof KeyCommandHandler !== 'undefined') {
-      KeyCommandHandler.init();
-      if (typeof SmartDrawKeys !== 'undefined') {
-        SmartDrawKeys.initializeKeyCommands(
-          KeyCommandHandler,
-          this.baseController
+        this.sidePanel.toolSettingsSection = this.sidePanel.addSection(
+          'setup',
+          'Tool Settings',
+          true
         );
-      }
-    }
+        this.sidePanel.compassSection = this.sidePanel.addSection(
+          'compass',
+          'Compass Controls',
+          true
+        );
+        this.sidePanel.p2pSection = this.sidePanel.addSection(
+          'p2p',
+          'Controller',
+          false
+        );
 
-    if (typeof RotaryEncoders !== 'undefined') {
-      RotaryEncoders.initialize(this.baseController);
-    }
+        this.baseController.sidePanel = this.sidePanel;
+        layoutWrapper.insertBefore(this.sidePanel.element, canvasContainer);
+        this._setupToolSettingsWatcher();
 
-    if (
-      localStorage.getItem('midi-controller-enabled') === 'true' &&
-      typeof MidiInputHandler !== 'undefined' &&
-      typeof MidiInputHandler.init === 'function'
-    ) {
-      MidiInputHandler.init((status) => {});
-    }
-
-    if (typeof CameraOrbitAnimator !== 'undefined') {
-      CameraOrbitAnimator.setDependencies(this.threeDView);
-    }
-
-    if (typeof DebugConfig !== 'undefined') {
-      if (DebugConfig.exposeThreeDView) globalThis.threeDView = this.threeDView;
-      if (DebugConfig.exposeBaseController)
-        globalThis.baseController = this.baseController;
-    }
-
-    if (env && typeof env.requestKeystrokeControl === 'function') {
-      env.requestKeystrokeControl((active) => {
-        if (this.baseController) {
-          this.baseController.isKeystrokeCaptureActive = active;
+        if (typeof CadStorageManager !== 'undefined') {
+          this.storageManager = new CadStorageManager(this.baseController);
+          this.storageManager.renderUI();
         }
-        if (typeof KeyCommandHandler !== 'undefined') {
-          KeyCommandHandler.setPaused(!active);
-        }
-      });
-    } else {
-      if (this.baseController) {
-        this.baseController.isKeystrokeCaptureActive = true;
+
+        this.sidePanel.open();
+      } else {
+        this.sidePanel = null;
       }
-    }
 
-    const initialRect = parentElement.getBoundingClientRect();
-    if (initialRect.width > 0 && initialRect.height > 0) {
-      this.app.resize(initialRect.width, initialRect.height);
-    }
+      // AccuDraw initialization with showUi option
+      if (opts.showCompass !== false && !this.baseController.accuDraw && typeof AccuDraw !== 'undefined') {
+        this.baseController.accuDraw = new AccuDraw(this.threeDView, {
+          squircleAmount: opts.squircle,
+          center: opts.compassCenter || [0, 0, 0],
+          color: opts.compassColor || 0x00f2fe,
+          size: opts.compassSize,
+          cameraOffset: 0.01,
+          showUi: opts.showCompassUi === true
+        });
+        this.threeDView.scene.add(this.baseController.accuDraw.getObject3D());
+      }
 
-    console.log('[accuCad] Application initialized successfully.');
-    return this;
+      if (opts.initialPlane) {
+        this.baseController.setDrawingPlane(opts.initialPlane);
+      }
+      if (opts.initialTool) {
+        this.baseController.setCommandByName(opts.initialTool);
+      }
+
+      // Preset geometry generation
+      if (opts.presetGeometry === 'bracket') {
+        if (typeof RectangleElement !== 'undefined') {
+          const rect = new RectangleElement([-1.2, -0.8, 0], [1.2, 0.8, 0], [
+            [1, 0, 0], [0, 0, -1], [0, 1, 0]
+          ]);
+          rect.color = '#38bdf8';
+          this.baseController.cadElements.push(rect);
+          ElementOperations.rebuildPermanentVisual(this.baseController, rect);
+
+          const box3d = new RectangleElement([0.4, 0.4, 0], [1.6, 1.4, 0.9], [
+            [1, 0, 0], [0, 1, 0], [0, 0, 1]
+          ]);
+          box3d.color = '#10b981';
+          this.baseController.cadElements.push(box3d);
+          ElementOperations.rebuildPermanentVisual(this.baseController, box3d);
+        }
+      } else if (opts.presetGeometry === 'primitives' && typeof Simple3dShapes !== 'undefined') {
+        Simple3dShapes.buildPrimitives(this.app, this.threeDView.scene);
+      }
+
+      // Set as active controller
+      BaseController.activeController = this.baseController;
+
+      const initialRect = parentElement.getBoundingClientRect();
+      if (initialRect.width > 0 && initialRect.height > 0) {
+        this.app.resize(initialRect.width, initialRect.height);
+      }
+
+      console.log('[accuCad] Application initialized successfully.');
+      return this;
   }
   destroy() {
       console.log('[accuCad] destroy() called.');
