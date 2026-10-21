@@ -694,34 +694,34 @@ class EventHandlers {
     }
 
   static _processSingleRightClick(controller, event) {
-      // 1. Release Tentative Point (Force Clear)
-      if (controller._tentativeOriginalPoint) {
-        console.log(
-          '%cRight Click: Released Tentative Point',
-          'color: yellow'
-        );
-        TentativePointHandler._clearTentativePoint(controller);
-        // Ensure mouse position is refreshed to update cursor
-        controller.refreshMousePosition();
-        return;
-      }
-
-      // 2. Unlock AccuDraw / Clear Input
-      let consumed = false;
-      if (controller.accuDrawLogic) {
-        consumed = controller.accuDrawLogic.handleInput('Escape');
-      }
-
-      // 3. Reset Command
-      if (!consumed) {
-        console.log('%cRight Click: Resetting Command', 'color: orange');
-        if (controller.activeCommand?.reset) {
-          controller.activeCommand.reset();
-        }
-      } else {
-        console.log('%cRight Click: Unlocked AccuDraw', 'color: cyan');
-      }
+    // 1. Release Tentative Point (Force Clear)
+    if (controller._tentativeOriginalPoint) {
+      console.log('%cRight Click: Released Tentative Point', 'color: yellow');
+      TentativePointHandler._clearTentativePoint(controller);
+      controller.refreshMousePosition();
+      return;
     }
+
+    // 2. Unlock AccuDraw / Clear Active Typing Input Buffer
+    let consumed = false;
+    if (controller.accuDrawLogic) {
+      consumed = controller.accuDrawLogic.handleInput('Escape');
+    }
+
+    // 3. Reset Active Command & Revert Compass to Baseline Plane (Rob Brown Invariant)
+    if (!consumed) {
+      console.log('%cRight Click: Resetting Command & Reverting Compass', 'color: orange');
+      if (controller.activeCommand?.reset) {
+        controller.activeCommand.reset();
+      }
+      // Revert context-rotated axes back to baseline plane (Top/Front/Side/View)
+      if (typeof controller.resetOrientationToBasePlane === 'function') {
+        controller.resetOrientationToBasePlane(true);
+      }
+    } else {
+      console.log('%cRight Click: Unlocked AccuDraw Input', 'color: cyan');
+    }
+  }
 }
 if (typeof window !== 'undefined') window.EventHandlers = EventHandlers;
 globalThis.EventHandlers = EventHandlers;

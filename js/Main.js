@@ -12,223 +12,216 @@ class Main {
   }
 
   async run(env, options = {}) {
-      console.log('[accuCad] run() invoked.');
-      if (this.rootElement) this.destroy();
+    console.log('[accuCad] run() invoked.');
+    if (this.rootElement) this.destroy();
 
-      if (!env || !env.container) {
-        throw new Error(
-          '[accuCad] run() requires an environment object with a valid container.'
-        );
+    if (!env || !env.container) {
+      throw new Error(
+        '[accuCad] run() requires an environment object with a valid container.'
+      );
+    }
+
+    const opts = Object.assign({
+      showSidePanel: true,
+      showCompass: true,
+      showCompassUi: false, // Default to clean in-canvas 3D compass with no floating DOM dialog clutter
+      cameraPos: { x: 5, y: 5, z: 8 },
+      target: [0, 0.4, 0],
+      background: 0x090d16,
+      enableControls: true,
+      presetGeometry: null,
+      initialTool: 'rectangle',
+      initialPlane: 'top',
+      squircle: 0.35,
+      compassSize: 0.85
+    }, env, options);
+
+    const parentElement = env.container;
+    this.rootElement = parentElement;
+
+    const resetScroll = () => {
+      if (this.rootElement) {
+        this.rootElement.scrollLeft = 0;
+        this.rootElement.scrollTop = 0;
       }
+    };
 
-      const opts = Object.assign({
-        showSidePanel: true,
-        showCompass: true,
-        showCompassUi: false,
-        cameraPos: { x: 5, y: 5, z: 8 },
-        target: [0, 0.4, 0],
-        background: 0x090d16,
-        enableControls: true,
-        presetGeometry: null,
-        initialTool: 'rectangle',
-        initialPlane: 'top',
-        squircle: 0.35,
-        compassSize: 0.85
-      }, env, options);
+    this.rootElement.addEventListener('scroll', resetScroll);
+    this._scrollResetHandler = resetScroll;
 
-      const parentElement = env.container;
-      this.rootElement = parentElement;
+    const layoutWrapper = document.createElement('div');
+    layoutWrapper.id = 'accucad-layout-wrapper';
+    layoutWrapper.style.cssText =
+      'display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; position: relative;';
+    parentElement.appendChild(layoutWrapper);
+    this.layoutWrapper = layoutWrapper;
 
-      const resetScroll = () => {
-        if (this.rootElement) {
-          this.rootElement.scrollLeft = 0;
-          this.rootElement.scrollTop = 0;
-        }
-        window.scrollTo(0, 0);
-        document.body.scrollLeft = 0;
-        document.body.scrollTop = 0;
-      };
+    const canvasId = 'accucad-canvas-' + Math.random().toString(36).slice(2);
+    const canvasContainer = document.createElement('div');
+    canvasContainer.id = canvasId;
+    canvasContainer.style.cssText =
+      'flex-grow: 1; width: 100%; height: 100%; position: relative; overflow: hidden;';
+    layoutWrapper.appendChild(canvasContainer);
+    this.canvasContainer = canvasContainer;
 
-      this.rootElement.addEventListener('scroll', resetScroll);
-      window.addEventListener('scroll', resetScroll);
-      document.body.addEventListener('scroll', resetScroll);
-      this._scrollResetHandler = resetScroll;
-
-      const layoutWrapper = document.createElement('div');
-      layoutWrapper.id = 'accucad-layout-wrapper';
-      layoutWrapper.style.cssText =
-        'display: flex; flex-direction: row; width: 100%; height: 100%; overflow: hidden; position: relative;';
-      parentElement.appendChild(layoutWrapper);
-      this.layoutWrapper = layoutWrapper;
-
-      const canvasId = 'accucad-canvas-' + Math.random().toString(36).slice(2);
-      const canvasContainer = document.createElement('div');
-      canvasContainer.id = canvasId;
-      canvasContainer.style.cssText =
-        'flex-grow: 1; width: 100%; height: 100%; position: relative; overflow: hidden;';
-      layoutWrapper.appendChild(canvasContainer);
-      this.canvasContainer = canvasContainer;
-
-      if (
-        !parentElement._vibesAppResizeObserver &&
-        typeof ResizeObserver !== 'undefined'
-      ) {
-        const ro = new ResizeObserver((entries) => {
-          for (const entry of entries) {
-            if (this.app && typeof this.app.resize === 'function') {
-              this.app.resize(entry.contentRect.width, entry.contentRect.height);
-            }
+    if (
+      !parentElement._vibesAppResizeObserver &&
+      typeof ResizeObserver !== 'undefined'
+    ) {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (this.app && typeof this.app.resize === 'function') {
+            this.app.resize(entry.contentRect.width, entry.contentRect.height);
           }
-        });
-        ro.observe(canvasContainer);
-        parentElement._vibesAppResizeObserver = ro;
-      }
-
-      const staticClasses = [
-        'CameraOrbitAnimator',
-        'DebugConfig',
-        'ElementOperations',
-        'ModelLoader',
-        'TentativePointHandler',
-        'ViewControlsManager',
-        'ViewManipulator',
-      ];
-      for (const clsName of staticClasses) {
-        const cls = window[clsName] || globalThis[clsName];
-        if (cls && typeof cls.initStatics === 'function') cls.initStatics();
-      }
-
-      if (typeof PopupBox !== 'undefined' && typeof PopupBox.init === 'function') {
-        PopupBox.init();
-      }
-
-      this.app = new ThreeJSLoader(canvasId, {
-        cameraPos: opts.cameraPos,
-        enableControls: opts.enableControls,
-        useThickLines: true,
-        commonLoaders: true,
-        environment: false,
-        lighting: true,
-        onUpdate: () => this._onUpdate?.(),
+        }
       });
+      ro.observe(canvasContainer);
+      parentElement._vibesAppResizeObserver = ro;
+    }
 
-      await this.app.init(canvasContainer);
+    const staticClasses = [
+      'CameraOrbitAnimator',
+      'DebugConfig',
+      'ElementOperations',
+      'ModelLoader',
+      'TentativePointHandler',
+      'ViewControlsManager',
+      'ViewManipulator',
+    ];
+    for (const clsName of staticClasses) {
+      const cls = window[clsName] || globalThis[clsName];
+      if (cls && typeof cls.initStatics === 'function') cls.initStatics();
+    }
 
-      this.THREE = this.app.THREE || window.THREE;
-      if (this.app.scene) {
-        this.app.scene.background = new this.THREE.Color(opts.background);
+    if (typeof PopupBox !== 'undefined' && typeof PopupBox.init === 'function') {
+      PopupBox.init();
+    }
+
+    this.app = new ThreeJSLoader(canvasId, {
+      cameraPos: opts.cameraPos,
+      enableControls: opts.enableControls,
+      useThickLines: true,
+      commonLoaders: true,
+      environment: false,
+      lighting: true,
+      onUpdate: () => this._onUpdate?.(),
+    });
+
+    await this.app.init(canvasContainer);
+
+    this.THREE = this.app.THREE || window.THREE;
+    if (this.app.scene) {
+      this.app.scene.background = new this.THREE.Color(opts.background);
+    }
+
+    const target = new this.THREE.Vector3(...opts.target);
+    this.app.camera.lookAt(target);
+
+    this.threeDView = {
+      scene: opts.sharedScene || this.app.scene,
+      camera: this.app.camera,
+      renderer: this.app.renderer,
+      target: target,
+      envRotation: 0,
+    };
+
+    if (opts.sharedController) {
+      this.baseController = opts.sharedController;
+    } else {
+      this.baseController = new BaseController(
+        this.threeDView,
+        this.app.renderer.domElement
+      );
+      // Explicitly pass showCompassUi to prevent spawning orphan floating dialogs
+      ControllerSetup.initializeController(
+        this.baseController,
+        this.threeDView.scene,
+        { showUi: opts.showCompassUi === true }
+      );
+    }
+
+    // Only mount SidePanel if explicitly requested
+    if (opts.showSidePanel && typeof SidePanel !== 'undefined') {
+      const sidePanelEnv = { container: layoutWrapper };
+      this.sidePanel = new SidePanel('left', 260, sidePanelEnv);
+
+      this.sidePanel.toolSettingsSection = this.sidePanel.addSection(
+        'setup',
+        'Tool Settings',
+        true
+      );
+      this.sidePanel.compassSection = this.sidePanel.addSection(
+        'compass',
+        'Compass Controls',
+        true
+      );
+      this.sidePanel.p2pSection = this.sidePanel.addSection(
+        'p2p',
+        'Controller',
+        false
+      );
+
+      this.baseController.sidePanel = this.sidePanel;
+      layoutWrapper.insertBefore(this.sidePanel.element, canvasContainer);
+      this._setupToolSettingsWatcher();
+
+      if (typeof CadStorageManager !== 'undefined') {
+        this.storageManager = new CadStorageManager(this.baseController);
+        this.storageManager.renderUI();
       }
 
-      const target = new this.THREE.Vector3(...opts.target);
-      this.app.camera.lookAt(target);
+      this.sidePanel.open();
+    } else {
+      this.sidePanel = null;
+    }
 
-      this.threeDView = {
-        scene: opts.sharedScene || this.app.scene,
-        camera: this.app.camera,
-        renderer: this.app.renderer,
-        target: target,
-        envRotation: 0,
-      };
+    // AccuDraw custom parameters update if already created by ControllerSetup
+    if (this.baseController.accuDraw) {
+      this.baseController.accuDraw.update({
+        squircleAmount: opts.squircle,
+        center: opts.compassCenter || [0, 0, 0],
+        color: opts.compassColor || 0x00f2fe,
+        size: opts.compassSize
+      });
+    }
 
-      if (opts.sharedController) {
-        this.baseController = opts.sharedController;
-      } else {
-        this.baseController = new BaseController(
-          this.threeDView,
-          this.app.renderer.domElement
-        );
-        ControllerSetup.initializeController(
-          this.baseController,
-          this.threeDView.scene
-        );
+    if (opts.initialPlane) {
+      this.baseController.setDrawingPlane(opts.initialPlane);
+    }
+    if (opts.initialTool) {
+      this.baseController.setCommandByName(opts.initialTool);
+    }
+
+    // Preset geometry generation
+    if (opts.presetGeometry === 'bracket') {
+      if (typeof RectangleElement !== 'undefined') {
+        const rect = new RectangleElement([-1.2, -0.8, 0], [1.2, 0.8, 0], [
+          [1, 0, 0], [0, 0, -1], [0, 1, 0]
+        ]);
+        rect.color = '#38bdf8';
+        this.baseController.cadElements.push(rect);
+        ElementOperations.rebuildPermanentVisual(this.baseController, rect);
+
+        const box3d = new RectangleElement([0.4, 0.4, 0], [1.6, 1.4, 0.9], [
+          [1, 0, 0], [0, 1, 0], [0, 0, 1]
+        ]);
+        box3d.color = '#10b981';
+        this.baseController.cadElements.push(box3d);
+        ElementOperations.rebuildPermanentVisual(this.baseController, box3d);
       }
+    } else if (opts.presetGeometry === 'primitives' && typeof Simple3dShapes !== 'undefined') {
+      Simple3dShapes.buildPrimitives(this.app, this.threeDView.scene);
+    }
 
-      // Only mount SidePanel if explicitly requested
-      if (opts.showSidePanel && typeof SidePanel !== 'undefined') {
-        const sidePanelEnv = { container: layoutWrapper };
-        this.sidePanel = new SidePanel('left', 260, sidePanelEnv);
+    BaseController.activeController = this.baseController;
 
-        this.sidePanel.toolSettingsSection = this.sidePanel.addSection(
-          'setup',
-          'Tool Settings',
-          true
-        );
-        this.sidePanel.compassSection = this.sidePanel.addSection(
-          'compass',
-          'Compass Controls',
-          true
-        );
-        this.sidePanel.p2pSection = this.sidePanel.addSection(
-          'p2p',
-          'Controller',
-          false
-        );
+    const initialRect = parentElement.getBoundingClientRect();
+    if (initialRect.width > 0 && initialRect.height > 0) {
+      this.app.resize(initialRect.width, initialRect.height);
+    }
 
-        this.baseController.sidePanel = this.sidePanel;
-        layoutWrapper.insertBefore(this.sidePanel.element, canvasContainer);
-        this._setupToolSettingsWatcher();
-
-        if (typeof CadStorageManager !== 'undefined') {
-          this.storageManager = new CadStorageManager(this.baseController);
-          this.storageManager.renderUI();
-        }
-
-        this.sidePanel.open();
-      } else {
-        this.sidePanel = null;
-      }
-
-      // AccuDraw initialization with showUi option
-      if (opts.showCompass !== false && !this.baseController.accuDraw && typeof AccuDraw !== 'undefined') {
-        this.baseController.accuDraw = new AccuDraw(this.threeDView, {
-          squircleAmount: opts.squircle,
-          center: opts.compassCenter || [0, 0, 0],
-          color: opts.compassColor || 0x00f2fe,
-          size: opts.compassSize,
-          cameraOffset: 0.01,
-          showUi: opts.showCompassUi === true
-        });
-        this.threeDView.scene.add(this.baseController.accuDraw.getObject3D());
-      }
-
-      if (opts.initialPlane) {
-        this.baseController.setDrawingPlane(opts.initialPlane);
-      }
-      if (opts.initialTool) {
-        this.baseController.setCommandByName(opts.initialTool);
-      }
-
-      // Preset geometry generation
-      if (opts.presetGeometry === 'bracket') {
-        if (typeof RectangleElement !== 'undefined') {
-          const rect = new RectangleElement([-1.2, -0.8, 0], [1.2, 0.8, 0], [
-            [1, 0, 0], [0, 0, -1], [0, 1, 0]
-          ]);
-          rect.color = '#38bdf8';
-          this.baseController.cadElements.push(rect);
-          ElementOperations.rebuildPermanentVisual(this.baseController, rect);
-
-          const box3d = new RectangleElement([0.4, 0.4, 0], [1.6, 1.4, 0.9], [
-            [1, 0, 0], [0, 1, 0], [0, 0, 1]
-          ]);
-          box3d.color = '#10b981';
-          this.baseController.cadElements.push(box3d);
-          ElementOperations.rebuildPermanentVisual(this.baseController, box3d);
-        }
-      } else if (opts.presetGeometry === 'primitives' && typeof Simple3dShapes !== 'undefined') {
-        Simple3dShapes.buildPrimitives(this.app, this.threeDView.scene);
-      }
-
-      // Set as active controller
-      BaseController.activeController = this.baseController;
-
-      const initialRect = parentElement.getBoundingClientRect();
-      if (initialRect.width > 0 && initialRect.height > 0) {
-        this.app.resize(initialRect.width, initialRect.height);
-      }
-
-      console.log('[accuCad] Application initialized successfully.');
-      return this;
+    console.log('[accuCad] Application initialized successfully.');
+    return this;
   }
   destroy() {
       console.log('[accuCad] destroy() called.');

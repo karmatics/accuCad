@@ -360,6 +360,88 @@ class BaseController {
       }
       return false;
   }
+
+  executeScript(codeStr) {
+    if (!codeStr || typeof codeStr !== 'string') {
+      return { success: false, error: 'Empty code string provided' };
+    }
+
+    try {
+      const fn = new Function(
+        'controller',
+        'bc',
+        'view',
+        'scene',
+        'camera',
+        'THREE',
+        'ElementOperations',
+        'RectangleElement',
+        'PathElement',
+        'ArcElement',
+        'CurveElement',
+        'CapsuleElement',
+        codeStr
+      );
+
+      const result = fn(
+        this,
+        this,
+        this.view,
+        this.view?.scene,
+        this.view?.camera,
+        globalThis.THREE,
+        globalThis.ElementOperations,
+        globalThis.RectangleElement,
+        globalThis.PathElement,
+        globalThis.ArcElement,
+        globalThis.CurveElement,
+        globalThis.CapsuleElement
+      );
+
+      this.refreshMousePosition();
+      return { success: true, result };
+    } catch (err) {
+      console.error('[BaseController.executeScript]', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  setCompassStyle(stylePreset = 'cyber') {
+    if (this.accuDraw && typeof this.accuDraw.setStylePreset === 'function') {
+      this.accuDraw.setStylePreset(stylePreset);
+      this.refreshMousePosition();
+      return true;
+    }
+    return false;
+  }
+
+  resetOrientationToBasePlane(animated = true) {
+    if (!this.basePlaneMatrix) {
+      this.basePlaneMatrix = [
+        [1, 0, 0],
+        [0, 0, -1],
+        [0, 1, 0]
+      ];
+    }
+
+    // Restore the baseline orientation frame active before context rotation
+    this.rotationMatrix = this.basePlaneMatrix.map(row => [...row]);
+
+    if (this.accuDraw) {
+      if (animated && typeof this.accuDraw.setRotationAnimated === 'function') {
+        this.accuDraw.setRotationAnimated(this.rotationMatrix, 0.2);
+      } else if (typeof this.accuDraw.update === 'function') {
+        this.accuDraw.update({ rotationMatrix: this.rotationMatrix });
+      }
+    }
+
+    if (this.accuDrawLogic && typeof this.accuDrawLogic.setRotation === 'function') {
+      this.accuDrawLogic.setRotation(this.rotationMatrix);
+    }
+
+    this.refreshMousePosition();
+    return this.rotationMatrix;
+  }
 }
 if (typeof window !== 'undefined') window.BaseController = BaseController;
 globalThis.BaseController = BaseController;

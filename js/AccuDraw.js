@@ -72,6 +72,7 @@ class AccuDraw {
         this.ui = null;
       }
   }
+
   _createDecorations() {
     if (this.decorationsGroup) {
       this.group.remove(this.decorationsGroup);
@@ -91,24 +92,45 @@ class AccuDraw {
     this.tickDims = {
       start: 0.4 * scale,
       end: 0.6 * scale,
-      radius: S / 60,
-      sphereRadius: S / 60,
+      radius: S / 55,
+      sphereRadius: S / 50,
       length: (0.6 - 0.4) * scale,
     };
 
-    const red = 0xff0000;
-    const green = 0x00ff00;
-    const gray = 0x808080;
     const dt = this.options.depthTest;
     const r = this.tickDims.radius;
-    const contrastCol = this.getContrastColor ? this.getContrastColor() : 0xffffff;
+    const stylePreset = this.options.stylePreset || 'cyber';
+
+    let redCol = 0xff3355;
+    let greenCol = 0x00e676;
+    let grayCol = 0x64748b;
+    let centerCol = 0xffffff;
+
+    if (stylePreset === 'steampunk') {
+      redCol = 0xc27803;      // Burnished Copper / Amber
+      greenCol = 0xd4af37;    // Polished Brass / Gold
+      grayCol = 0x5c4033;     // Cast Iron Bronze
+      centerCol = 0xffd700;   // Gold Rivet
+    } else if (stylePreset === 'classic') {
+      redCol = 0xd32f2f;      // Classic Bentley 1995 Red
+      greenCol = 0x2e7d32;    // Classic Bentley 1995 Green
+      grayCol = 0x757575;     // Muted Gray
+      centerCol = 0xffffff;
+    } else if (stylePreset === 'minimal') {
+      redCol = 0xff5555;
+      greenCol = 0x55ff55;
+      grayCol = 0x334155;
+      centerCol = 0xffffff;
+    }
+
+    const contrastCol = this.getContrastColor ? this.getContrastColor() : centerCol;
 
     const createTick = (axis, sign, color) => {
       const h = this.tickDims.length;
       const cylinderGeometry = new THREE.CylinderGeometry(r, r, h, 16, 1);
       if (axis === 'x') cylinderGeometry.rotateZ((sign * Math.PI) / 2);
 
-      const sphereGeo = new THREE.SphereGeometry(r, 16, 16);
+      const sphereGeo = new THREE.SphereGeometry(r * 1.15, 16, 16);
       const material = new THREE.MeshBasicMaterial({
         color: color,
         depthTest: dt,
@@ -139,17 +161,17 @@ class AccuDraw {
       return grp;
     };
 
-    const tx = createTick('x', 1, red);
-    const tnx = createTick('x', -1, gray);
-    const ty = createTick('y', 1, green);
-    const tny = createTick('y', -1, gray);
+    const tx = createTick('x', 1, redCol);
+    const tnx = createTick('x', -1, grayCol);
+    const ty = createTick('y', 1, greenCol);
+    const tny = createTick('y', -1, grayCol);
 
     this.axisTicks.x.push(tx, tnx);
     this.axisTicks.y.push(ty, tny);
 
     this.decorationsGroup.add(tx, tnx, ty, tny);
 
-    // Center Dot (dynamically contrasts against background)
+    // Center Dot
     const centerRadius = (2 / 3) * 0.05 * scale;
     const centerSphere = new THREE.Mesh(
       new THREE.SphereGeometry(centerRadius, 32, 32),
@@ -717,6 +739,59 @@ class AccuDraw {
       });
     }
 
+    this._createDecorations();
+  }
+
+  destroy() {
+    if (this.ui) {
+      if (typeof this.ui.destroy === 'function') {
+        try { this.ui.destroy(); } catch (e) {}
+      } else if (typeof this.ui.hide === 'function') {
+        try { this.ui.hide(); } catch (e) {}
+      }
+      this.ui = null;
+    }
+    if (this.projectedMarker) {
+      if (this.projectedMarker.parent) {
+        this.projectedMarker.parent.remove(this.projectedMarker);
+      }
+      this.projectedMarker = null;
+    }
+    if (this.group) {
+      if (this.group.parent) {
+        this.group.parent.remove(this.group);
+      }
+    }
+    if (this.decorationsGroup) {
+      this.decorationsGroup.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+      });
+    }
+  }
+
+  setStylePreset(preset = 'cyber') {
+    this.options.stylePreset = preset;
+    if (preset === 'steampunk') {
+      this.options.color = 0xd4af37; // Antique Gold Brass
+      this.options.opacity = 0.65;
+    } else if (preset === 'classic') {
+      this.options.color = 0x88ccff; // MicroStation Soft Azure
+      this.options.opacity = 0.5;
+    } else if (preset === 'minimal') {
+      this.options.color = 0x38bdf8;
+      this.options.opacity = 0.35;
+    } else {
+      this.options.color = 0x00f2fe; // Cyber Neon Cyan
+      this.options.opacity = 0.55;
+    }
+
+    if (this.marker3D && typeof this.marker3D.update === 'function') {
+      this.marker3D.update({
+        color: this.options.color,
+        opacity: this.options.opacity
+      });
+    }
     this._createDecorations();
   }
 }

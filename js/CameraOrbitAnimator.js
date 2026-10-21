@@ -11,52 +11,55 @@ class CameraOrbitAnimator {
   }
 
   static start(params = {}) {
-    this.initStatics();
-    // If dialog is not open, open it (which acts as the 'start' trigger)
-    if (!this._dialog) {
-      this.showDialog();
-    }
-
-    this._params = Object.assign({}, this._params, params);
-    this._syncWithGlobalSettings();
-
-    if (!this._threeDView) {
-      console.error('CameraOrbitAnimator dependencies not set.');
-      return;
-    }
-    if (this._threeDView.camera.isOrthographicCamera) {
-      console.log('Orthographic camera; orbit animation not applied.');
-      return;
-    }
-
-    // Only reset initial positions if we are not just resuming from a pause
-    if (!this._running && !this._isPausedForInteraction) {
-      this._initialCamPos = this._threeDView.camera.position.clone();
-      this._initialTarget = this._threeDView.target.clone();
-      const D = this._initialCamPos.clone().sub(this._initialTarget);
-      this._distance = D.length();
-
-      const normal = D.clone().normalize();
-      let arbitrary = new THREE.Vector3(0, 1, 0);
-      if (Math.abs(normal.dot(arbitrary)) > 0.99) {
-        arbitrary.set(1, 0, 0);
+      this.initStatics();
+      if (!this._dialog) {
+        this.showDialog();
       }
-      this._tangent = new THREE.Vector3()
-        .crossVectors(normal, arbitrary)
-        .normalize();
-      this._bitangent = new THREE.Vector3()
-        .crossVectors(normal, this._tangent)
-        .normalize();
 
-      this._startTime = performance.now();
+      this._params = Object.assign({}, this._params, params);
+      this._syncWithGlobalSettings();
+
+      if (!this._threeDView) {
+        if (typeof globalThis.threeDView !== 'undefined' && globalThis.threeDView) {
+          this._threeDView = globalThis.threeDView;
+        } else if (typeof window !== 'undefined' && window.threeDView) {
+          this._threeDView = window.threeDView;
+        }
+      }
+
+      if (!this._threeDView || !this._threeDView.camera) {
+        return;
+      }
+      if (this._threeDView.camera.isOrthographicCamera) {
+        return;
+      }
+
+      if (!this._running && !this._isPausedForInteraction) {
+        this._initialCamPos = this._threeDView.camera.position.clone();
+        this._initialTarget = this._threeDView.target.clone();
+        const D = this._initialCamPos.clone().sub(this._initialTarget);
+        this._distance = D.length();
+
+        const normal = D.clone().normalize();
+        let arbitrary = new THREE.Vector3(0, 1, 0);
+        if (Math.abs(normal.dot(arbitrary)) > 0.99) {
+          arbitrary.set(1, 0, 0);
+        }
+        this._tangent = new THREE.Vector3()
+          .crossVectors(normal, arbitrary)
+          .normalize();
+        this._bitangent = new THREE.Vector3()
+          .crossVectors(normal, this._tangent)
+          .normalize();
+
+        this._startTime = performance.now();
+      }
+
+      this._running = true;
+      this._isPausedForInteraction = false;
+      this._maxRadius = this._distance * this._params.radiusFraction;
+      this._animate();
     }
-
-    this._running = true;
-    this._isPausedForInteraction = false;
-    this._maxRadius = this._distance * this._params.radiusFraction;
-    this._animate();
-  }
-
   static _syncWithGlobalSettings() {
     // This now references an internal property, but can still be overridden by the window object for debugging.
     const settings =
