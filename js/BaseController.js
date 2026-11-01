@@ -442,6 +442,12 @@ class BaseController {
     this.refreshMousePosition();
     return this.rotationMatrix;
   }
+
+  handleKeyDown(event) {
+      if (typeof EventHandlers !== 'undefined' && typeof EventHandlers.handleKeyDown === 'function') {
+        EventHandlers.handleKeyDown(this, event);
+      }
+    }
 }
 if (typeof window !== 'undefined') window.BaseController = BaseController;
 globalThis.BaseController = BaseController;

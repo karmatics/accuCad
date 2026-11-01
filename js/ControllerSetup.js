@@ -1,60 +1,66 @@
 class ControllerSetup {
 
   static initializeController(baseController, scene, options = {}) {
-    baseController.registerCommand(
-      'rectangle',
-      new DrawRectangleCommand(baseController)
-    );
-    baseController.registerCommand('arc', new DrawArcCommand(baseController));
-    baseController.registerCommand('path', new DrawPathCommand(baseController));
-    baseController.registerCommand(
-      'curve',
-      new DrawCurveCommand(baseController)
-    );
-    baseController.registerCommand(
-      'circle',
-      new DrawCircleCommand(baseController)
-    );
-    baseController.registerCommand(
-      'capsule',
-      new DrawCapsuleCommand(baseController)
-    );
-    baseController.registerCommand(
-      'move',
-      new MoveElementCommand(baseController)
-    );
-    baseController.registerCommand(
-      'rotate',
-      new RotateElementCommand(baseController)
-    );
-    baseController.registerCommand(
-      'scale',
-      new ScaleElementCommand(baseController)
-    );
-    baseController.registerCommand(
-      'delete',
-      new DeleteElementCommand(baseController)
-    );
+      baseController.registerCommand(
+        'rectangle',
+        new DrawRectangleCommand(baseController)
+      );
+      baseController.registerCommand('arc', new DrawArcCommand(baseController));
+      baseController.registerCommand('path', new DrawPathCommand(baseController));
+      baseController.registerCommand(
+        'curve',
+        new DrawCurveCommand(baseController)
+      );
+      baseController.registerCommand(
+        'circle',
+        new DrawCircleCommand(baseController)
+      );
+      baseController.registerCommand(
+        'capsule',
+        new DrawCapsuleCommand(baseController)
+      );
+      baseController.registerCommand(
+        'move',
+        new MoveElementCommand(baseController)
+      );
+      baseController.registerCommand(
+        'rotate',
+        new RotateElementCommand(baseController)
+      );
+      baseController.registerCommand(
+        'scale',
+        new ScaleElementCommand(baseController)
+      );
+      baseController.registerCommand(
+        'delete',
+        new DeleteElementCommand(baseController)
+      );
 
-    baseController.setCommandByName('rectangle');
-    baseController.setColor('#00ff00');
-    baseController.setLineWidth(2);
+      baseController.setCommandByName('rectangle');
+      baseController.setColor('#00ff00');
+      baseController.setLineWidth(2);
 
-    baseController.setDrawingPlane('top');
+      baseController.setDrawingPlane('top');
 
-    // Prevent rogue floating AccuDrawUi dialogs by respecting options.showUi
-    baseController.accuDraw = new AccuDraw(baseController.view, {
-      squircleAmount: 0.3,
-      center: [0, 0, 0],
-      color: 0x88ccff,
-      size: 0.7,
-      cameraOffset: 0.01,
-      showUi: options.showUi === true,
-      baseController: baseController
-    });
-    scene.add(baseController.accuDraw.getObject3D());
-    baseController.setDrawingPlane('top');
-  }
+      // Register SmartDrawKeys with KeyCommandHandler for single-stroke CAD dispatch
+      if (typeof KeyCommandHandler !== 'undefined' && typeof SmartDrawKeys !== 'undefined') {
+        KeyCommandHandler.init();
+        SmartDrawKeys.initializeKeyCommands(KeyCommandHandler, baseController);
+      }
+
+      // Prevent rogue floating AccuDrawUi dialogs by respecting options.showUi
+      baseController.accuDraw = new AccuDraw(baseController.view, {
+        squircleAmount: 0.3,
+        center: [0, 0, 0],
+        color: 0x88ccff,
+        size: 0.7,
+        cameraOffset: 0.01,
+        showUi: options.showUi === true,
+        baseController: baseController
+      });
+      scene.add(baseController.accuDraw.getObject3D());
+      baseController.setDrawingPlane('top');
+    }
 }
 
 /* recursi-meta
