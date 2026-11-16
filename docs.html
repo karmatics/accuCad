@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>accuCad Technical Documentation & Architecture Reference</title>
+  <title>accuCad Technical Documentation &amp; Architecture Reference</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; min-height: 100%; background: #0f141c; color: #e2e8f0; font-family: -apple-system, system-ui, sans-serif; }
@@ -11,8 +11,14 @@
   </style>
   <script src="../Library/DomBasics.js" onerror="this.onerror=null; this.src='/Library/DomBasics.js';"></script>
   <script src="../Library/UITools.js" onerror="this.onerror=null; this.src='/Library/UITools.js';"></script>
+  <script src="../Library/SidePanel.js" onerror="this.onerror=null; this.src='/Library/SidePanel.js';"></script>
+  <script src="../Library/DictationWidget.js" onerror="this.onerror=null; this.src='/Library/DictationWidget.js';"></script>
+  <script src="../Library/CadPlanDataRegistry.js" onerror="this.onerror=null; this.src='/Library/CadPlanDataRegistry.js';"></script>
+  <script src="../Library/CadPlanItemNotes.js" onerror="this.onerror=null; this.src='/Library/CadPlanItemNotes.js';"></script>
+  <script src="../Library/CadPlanDocumentEditor.js" onerror="this.onerror=null; this.src='/Library/CadPlanDocumentEditor.js';"></script>
+  <script src="../Library/CadPlanAardvark.js" onerror="this.onerror=null; this.src='/Library/CadPlanAardvark.js';"></script>
   <script src="../Library/DocumentReader.js" onerror="this.onerror=null; this.src='/Library/DocumentReader.js';"></script>
-  
+
   <!-- Documentation content classes -->
   <script src="js/docs/AccuCadArchitectureDoc.js"></script>
   <script src="js/docs/AccuDrawEngineDoc.js"></script>
@@ -31,6 +37,7 @@
         container: document.getElementById('doc-root'),
         brandTitle: 'accuCad Engine Docs',
         brandIcon: '📐',
+        dossierId: 'accuCad',
         pages: [
           {
             id: 'architecture',
