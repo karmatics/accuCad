@@ -899,109 +899,109 @@ class ViewControls {
     }
 
   getNavigatableSliders() {
-    const list = [];
+      const list = [];
 
-    if (this.sliders.size) {
-      list.push({ key: 'size', slider: this.sliders.size, type: 'compass' });
-    }
+      if (this.sliders.size) {
+        list.push({ key: 'size', slider: this.sliders.size, type: 'compass' });
+      }
 
-    if (this.compassSwatch) {
-      list.push({
-        key: 'compassColor',
-        slider: {
-          container: this.compassSwatch.parentElement || this.compassSwatch,
-          value: this._hexToHsv(this._compassColorHex || '#88ccff').h,
-          setValue: (val) => {
-            const hsv = this._hexToHsv(this._compassColorHex || '#88ccff');
-            const newHex = this._hsvToHex(val % 360, hsv.s, hsv.v);
-            this._compassColorHex = newHex;
-            if (this.compassSwatch) {
-              this.compassSwatch.style.backgroundColor = newHex;
-            }
-            if (this.baseController.accuDraw?.update) {
-              this.baseController.accuDraw.update({ color: this._colorToRgbNum(newHex) });
-            }
-            this._saveSetting('hexColor', newHex);
-          }
-        },
-        type: 'compass'
-      });
-    }
-
-    const remainingKeys = ['opa', 'sqrcl', 'xrot', 'yrot', 'zrot', 'bg', 'accudrawZ'];
-    remainingKeys.forEach(key => {
-      if (this.sliders[key]) {
+      if (this.compassSwatch) {
         list.push({
-          key: key,
-          slider: this.sliders[key],
+          key: 'compassColor',
+          slider: {
+            container: this.compassSwatch.parentElement || this.compassSwatch,
+            value: this._hexToHsv(this._compassColorHex || '#88ccff').h,
+            setValue: (val) => {
+              const hsv = this._hexToHsv(this._compassColorHex || '#88ccff');
+              const newHex = this._hsvToHex(val % 360, hsv.s, hsv.v);
+              this._compassColorHex = newHex;
+              if (this.compassSwatch) {
+                this.compassSwatch.style.backgroundColor = newHex;
+              }
+              if (this.baseController.accuDraw?.update) {
+                this.baseController.accuDraw.update({ color: this._colorToRgbNum(newHex) });
+              }
+              this._saveSetting('hexColor', newHex);
+            }
+          },
           type: 'compass'
         });
       }
-    });
 
-    const swatchPicker = this.baseController?.colorSwatchPicker;
-    if (swatchPicker) {
-      const hsv = this._hexToHsv(this.baseController.currentColor || '#00ff00');
-      list.push({
-        key: 'drawingColor',
-        slider: {
-          container: swatchPicker.parentElement || swatchPicker,
-          value: hsv.h,
-          setValue: (val) => {
-            const hsvCurrent = this._hexToHsv(this.baseController.currentColor || '#00ff00');
-            const newHex = this._hsvToHex(val % 360, hsvCurrent.s, hsvCurrent.v);
-            this.baseController.setColor(newHex);
-            if (this.baseController.colorSwatchPicker) {
-              this.baseController.colorSwatchPicker.style.backgroundColor = newHex;
-            }
-            this.baseController.refreshMousePosition();
-          }
-        },
-        type: 'tool'
-      });
-    }
-
-    const sidePanel = this.baseController?.sidePanel;
-    const toolSliders = this.baseController?.toolSliders || sidePanel?.toolSliders;
-    if (toolSliders) {
-      Object.entries(toolSliders).forEach(([key, slider]) => {
-        if (slider) {
+      const remainingKeys = ['opa', 'sqrcl', 'xrot', 'yrot', 'zrot', 'bg', 'accudrawZ'];
+      remainingKeys.forEach(key => {
+        if (this.sliders[key]) {
           list.push({
             key: key,
-            slider: slider,
-            type: 'tool'
+            slider: this.sliders[key],
+            type: 'compass'
           });
         }
       });
-    }
 
-    // Add custom command checkboxes with exact 1:1 DOM row filtering
-    const activeCmd = this.baseController?.activeCommand;
-    if (activeCmd && typeof activeCmd.getCommandSettings === 'function') {
-      const customSettings = activeCmd.getCommandSettings();
-      const checkboxSettings = customSettings.filter(s => s.type === 'checkbox');
-      const rows = document.querySelectorAll('.tool-setting-checkbox-row');
-
-      checkboxSettings.forEach((setting, idx) => {
-        const row = rows[idx];
-        if (row) {
-          list.push({
-            key: setting.id,
-            type: 'tool',
-            isCheckbox: true,
-            setting: setting,
-            slider: {
-              container: row,
-              value: setting.value ? 1 : 0,
-              setValue: (val) => {}
+      const swatchPicker = this.baseController?.colorSwatchPicker;
+      if (swatchPicker) {
+        const hsv = this._hexToHsv(this.baseController.currentColor || '#00ff00');
+        list.push({
+          key: 'drawingColor',
+          slider: {
+            container: swatchPicker.parentElement || swatchPicker,
+            value: hsv.h,
+            setValue: (val) => {
+              const hsvCurrent = this._hexToHsv(this.baseController.currentColor || '#00ff00');
+              const newHex = this._hsvToHex(val % 360, hsvCurrent.s, hsvCurrent.v);
+              this.baseController.setColor(newHex);
+              if (this.baseController.colorSwatchPicker) {
+                this.baseController.colorSwatchPicker.style.backgroundColor = newHex;
+              }
+              this.baseController.refreshMousePosition();
             }
-          });
-        }
-      });
-    }
+          },
+          type: 'tool'
+        });
+      }
 
-    return list;
-  }
+      const sidePanel = this.baseController?.sidePanel;
+      const toolSliders = this.baseController?.toolSliders || sidePanel?.toolSliders;
+      if (toolSliders) {
+        Object.entries(toolSliders).forEach(([key, slider]) => {
+          if (slider) {
+            list.push({
+              key: key,
+              slider: slider,
+              type: 'tool'
+            });
+          }
+        });
+      }
+
+      const activeCmd = this.baseController?.activeCommand;
+      if (activeCmd && typeof activeCmd.getCommandSettings === 'function') {
+        const customSettings = activeCmd.getCommandSettings();
+        const checkboxSettings = customSettings.filter(s => s.type === 'checkbox');
+        const scopeRoot = sidePanel?.toolSettingsSection || document;
+        const rows = scopeRoot.querySelectorAll('.tool-setting-checkbox-row');
+
+        checkboxSettings.forEach((setting, idx) => {
+          const row = rows[idx];
+          if (row) {
+            list.push({
+              key: setting.id,
+              type: 'tool',
+              isCheckbox: true,
+              setting: setting,
+              slider: {
+                container: row,
+                value: setting.value ? 1 : 0,
+                setValue: (val) => {}
+              }
+            });
+          }
+        });
+      }
+
+      return list;
+    }
   selectSliderAbsolute(index) {
       const list = this.getNavigatableSliders();
       if (list.length === 0) return;
@@ -1010,82 +1010,80 @@ class ViewControls {
     }
 
   handleSliderDragStart(mode) {
-      this.p2pControlMode = mode === 'sliders' ? 'compass' : (mode || 'compass');
-      
-      const sidePanel = this.baseController?.sidePanel;
-      if (!sidePanel) return;
+        this.p2pControlMode = mode === 'sliders' ? 'compass' : (mode || 'compass');
 
-      const sectionObj = this.p2pControlMode === 'compass' 
-        ? sidePanel.sections['compass']
-        : sidePanel.sections['setup'];
-        
-      const parent = sectionObj?.element;
-      if (!parent) return;
+        const sidePanel = this.baseController?.sidePanel;
+        if (!sidePanel) return;
 
-      // Glow neon green dashed indicator
-      if (!this.hoverIndicatorLine) {
-        this.hoverIndicatorLine = document.createElement('div');
-        this.hoverIndicatorLine.id = 'p2p-hover-indicator-line';
-        this.hoverIndicatorLine.style.cssText = 'position: fixed; left: 12px; right: 12px; height: 1px; border-top: 1.5px dashed #00e676; pointer-events: none; z-index: 999999; opacity: 0; transition: opacity 0.15s ease; filter: drop-shadow(0 0 3px #00e676);';
+        const sectionObj = this.p2pControlMode === 'compass' 
+          ? sidePanel.sections['compass']
+          : sidePanel.sections['setup'];
+
+        const parent = sectionObj?.element;
+        if (!parent) return;
+
+        parent.open = true;
+
+        if (!this.hoverIndicatorLine) {
+          this.hoverIndicatorLine = document.createElement('div');
+          this.hoverIndicatorLine.id = 'p2p-hover-indicator-line';
+          this.hoverIndicatorLine.style.cssText = 'position: fixed; left: 12px; right: 12px; height: 1px; border-top: 1.5px dashed #00e676; pointer-events: none; z-index: 999999; opacity: 0; transition: opacity 0.15s ease; filter: drop-shadow(0 0 3px #00e676);';
+        }
+
+        if (this.hoverIndicatorLine.parentElement !== document.body) {
+          document.body.appendChild(this.hoverIndicatorLine);
+        }
+
+        const allSliders = this.getNavigatableSliders();
+        this.activeSlidersForDrag = allSliders.filter(item => {
+          return item.type === this.p2pControlMode;
+        });
+
+        const N = this.activeSlidersForDrag.length;
+        if (N === 0) return;
+
+        const globalIndex = this.selectedSliderIndex || 0;
+        let localIndex = this.activeSlidersForDrag.findIndex(item => {
+          return allSliders.indexOf(item) === globalIndex;
+        });
+        if (localIndex === -1) {
+          localIndex = 0;
+          this.selectedSliderIndex = allSliders.indexOf(this.activeSlidersForDrag[0]);
+          this._updateSlidersHighlighting();
+        }
+        this.dragLocalIndex = localIndex;
+
+        const firstSlider = this.activeSlidersForDrag[0].slider?.container;
+        const lastSlider = this.activeSlidersForDrag[N - 1].slider?.container;
+
+        if (!firstSlider || !lastSlider) return;
+
+        const firstRect = firstSlider.getBoundingClientRect();
+        const lastRect = lastSlider.getBoundingClientRect();
+
+        const firstCenterY = (firstRect.top + firstRect.bottom) / 2;
+        const lastCenterY = (lastRect.top + lastRect.bottom) / 2;
+
+        this.dragTotalHeight = lastCenterY - firstCenterY;
+        this.dragMinY = firstCenterY;
+        this.dragMaxY = lastCenterY;
+
+        const parentRect = parent.getBoundingClientRect();
+        this.hoverIndicatorLine.style.left = `${parentRect.left + 8}px`;
+        this.hoverIndicatorLine.style.width = `${parentRect.width - 16}px`;
+
+        const selectedSlider = this.activeSlidersForDrag[localIndex].slider?.container;
+        if (selectedSlider) {
+          const selectedRect = selectedSlider.getBoundingClientRect();
+          const centerY = (selectedRect.top + selectedRect.bottom) / 2;
+          this.dragStartCenterY = centerY;
+          this.dragCurrentY = centerY;
+
+          this.hoverIndicatorLine.style.top = `${centerY}px`;
+          this.hoverIndicatorLine.style.display = 'block';
+          this.hoverIndicatorLine.style.opacity = '1';
+        }
       }
-
-      if (this.hoverIndicatorLine.parentElement !== document.body) {
-        document.body.appendChild(this.hoverIndicatorLine);
-      }
-
-      const allSliders = this.getNavigatableSliders();
-      this.activeSlidersForDrag = allSliders.filter(item => {
-        return item.type === this.p2pControlMode;
-      });
-
-      const N = this.activeSlidersForDrag.length;
-      if (N === 0) return;
-
-      const globalIndex = this.selectedSliderIndex || 0;
-      let localIndex = this.activeSlidersForDrag.findIndex(item => {
-        return allSliders.indexOf(item) === globalIndex;
-      });
-      if (localIndex === -1) {
-        localIndex = 0;
-        this.selectedSliderIndex = allSliders.indexOf(this.activeSlidersForDrag[0]);
-        this._updateSlidersHighlighting();
-      }
-      this.dragLocalIndex = localIndex;
-
-      // Extract viewport offsets cleanly
-      const firstSlider = this.activeSlidersForDrag[0].slider?.container;
-      const lastSlider = this.activeSlidersForDrag[N - 1].slider?.container;
-
-      if (!firstSlider || !lastSlider) return;
-
-      const firstRect = firstSlider.getBoundingClientRect();
-      const lastRect = lastSlider.getBoundingClientRect();
-
-      // Set boundary values to align exactly with the first and last slider centers
-      const firstCenterY = (firstRect.top + firstRect.bottom) / 2;
-      const lastCenterY = (lastRect.top + lastRect.bottom) / 2;
-
-      this.dragTotalHeight = lastCenterY - firstCenterY;
-      this.dragMinY = firstCenterY;
-      this.dragMaxY = lastCenterY;
-
-      const parentRect = parent.getBoundingClientRect();
-      this.hoverIndicatorLine.style.left = `${parentRect.left + 8}px`;
-      this.hoverIndicatorLine.style.width = `${parentRect.width - 16}px`;
-
-      const selectedSlider = this.activeSlidersForDrag[localIndex].slider?.container;
-      if (selectedSlider) {
-        const selectedRect = selectedSlider.getBoundingClientRect();
-        const centerY = (selectedRect.top + selectedRect.bottom) / 2;
-        this.dragStartCenterY = centerY;
-        this.dragCurrentY = centerY;
-
-        this.hoverIndicatorLine.style.top = `${centerY}px`;
-        this.hoverIndicatorLine.style.display = 'block';
-        this.hoverIndicatorLine.style.opacity = '1';
-      }
-    }
-
   handleSliderDragMove(dy, phoneHeight) {
       if (!this.hoverIndicatorLine || !this.activeSlidersForDrag) return;
 
@@ -1439,5 +1437,21 @@ class ViewControls {
       const num = this._colorToRgbNum(colorInput);
       return '#' + num.toString(16).padStart(6, '0');
     }
+
+  _showDiagnosticHud(key, startVal, ratio, newVal) {
+        let hud = document.getElementById('p2p-slider-hud');
+        if (!hud) {
+          hud = document.createElement('div');
+          hud.id = 'p2p-slider-hud';
+          hud.style.cssText = 'position:fixed; bottom:18px; right:18px; padding:6px 14px; background:rgba(15,23,42,0.92); border:1px solid #00e676; border-radius:20px; color:#f8fafc; font-family:monospace; font-size:12px; font-weight:bold; z-index:999999; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,0.5); transition:opacity 0.2s;';
+          document.body.appendChild(hud);
+        }
+        hud.textContent = `${key}: ${typeof newVal === 'number' ? newVal.toFixed(2) : newVal}`;
+        hud.style.opacity = '1';
+        clearTimeout(this._hudHideTimer);
+        this._hudHideTimer = setTimeout(() => {
+          if (hud) hud.style.opacity = '0';
+        }, 1100);
+      }
 }
 

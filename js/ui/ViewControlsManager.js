@@ -7,13 +7,20 @@ class ViewControlsManager {
   }
 
   static init(baseController, threeDView, customCompassContainer = null) {
-      this.initStatics();
-      if (!this.instance) {
+        this.initStatics();
+        if (this.instance) {
+          if (
+            this.instance.baseController === baseController &&
+            (!customCompassContainer || this.instance.customCompassContainer === customCompassContainer)
+          ) {
+            return this.instance;
+          }
+          this.destroy();
+        }
         this.instance = new ViewControls(baseController, threeDView, customCompassContainer);
         this.instance.show();
+        return this.instance;
       }
-    }
-
   static toggle() {
     if (this.instance) {
       this.instance.toggle();
